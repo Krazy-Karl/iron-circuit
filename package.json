@@ -1,0 +1,12 @@
+{
+  "name": "iron-circuit",
+  "version": "1.0.0",
+  "description": "Course de combat en 3D dans le navigateur, en solo ou en réseau local (LAN).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build:solo": "python3 tools/build-solo.py"
+  },
+  "engines": { "node": ">=16" },
+  "private": true
+}
