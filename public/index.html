@@ -156,6 +156,26 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
 #perf h3{margin:6px 0 2px;font-size:11px;letter-spacing:.16em;color:var(--dim);font-weight:600}
 #perf h3:first-child{margin-top:0}
 #perf .verdict{margin-top:6px;padding-top:6px;border-top:1px solid var(--line);font-size:13px;line-height:1.35;color:var(--bone);font-weight:500}
+.garage{place-items:center start;background:linear-gradient(90deg,rgba(8,9,12,.9) 0,rgba(8,9,12,.75) 42%,rgba(8,9,12,0) 72%)}
+.garage .panel{max-width:500px;gap:10px;padding:22px 28px 22px;max-height:calc(100vh - 24px);overflow-y:auto}
+.garage h2{margin:0}
+.garage .note{margin:0;font-size:14px}
+.gsec{display:grid;gap:6px}
+.gsec .seg{flex-wrap:wrap}
+.gstats{display:grid;gap:5px;margin:0}
+.gstat{display:grid;grid-template-columns:100px minmax(0,1fr) 72px;gap:10px;align-items:center;font-size:14px;line-height:1.25}
+.gstat dt{color:var(--dim)}
+.gstat dd{margin:0;height:8px;background:rgba(255,255,255,.08);position:relative}
+.gstat dd i{position:absolute;inset:0 auto 0 0;background:var(--sodium)}
+.gstat b{font-size:15px;text-align:right;font-variant-numeric:tabular-nums}
+.swatches{display:flex;flex-wrap:wrap;gap:8px}
+.swatches button{width:34px;height:34px;border:2px solid var(--line);cursor:pointer;padding:0}
+.swatches button[aria-pressed="true"]{border-color:var(--bone);box-shadow:0 0 0 2px var(--sodium)}
+#lockMark{position:fixed;left:0;top:0;width:54px;height:54px;margin:-27px 0 0 -27px;pointer-events:none;z-index:5;border:2px dashed var(--sodium);transform-origin:center}
+#lockMark.locked{border:3px solid var(--blood)}
+#lockMark span{position:absolute;top:58px;left:50%;transform:translateX(-50%);font-size:13px;font-weight:700;letter-spacing:.14em;white-space:nowrap;color:var(--sodium);text-shadow:0 1px 2px #000}
+#lockMark.locked span{color:var(--blood)}
+#players li small .lo{display:block;letter-spacing:.04em;color:var(--dim);font-size:12px}
 .settings{display:grid;gap:14px;padding-top:14px;border-top:1px solid var(--line)}
 .set{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center}
 .set label{font-size:16px}
@@ -214,6 +234,7 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
   <span id="crossTxt"></span>
 </div>
 <div id="gunMark" hidden></div>
+<div id="lockMark" hidden><span></span></div>
 <div id="perf" class="hud" hidden></div>
 <div id="countdown" hidden></div>
 
@@ -248,6 +269,7 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
     </div>
     <div class="row" id="soloStartRow" hidden>
       <button type="button" class="btn" id="soloStart">Démarrer la course</button>
+      <button type="button" class="btn ghost" id="garageBtnSolo">Garage</button>
       <span class="note" id="bestNote"></span>
     </div>
     <form id="joinForm" class="row" autocomplete="off">
@@ -316,6 +338,7 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
     </div>
     <div class="row">
       <button type="button" class="btn" id="startBtn">Lancer la course</button>
+      <button type="button" class="btn ghost" id="garageBtnLobby">Garage</button>
       <span class="note" id="waitNote">En attente de l’hôte pour lancer la course.</span>
     </div>
   </div>
@@ -348,6 +371,18 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
       <button type="button" class="btn" id="resumeBtn">Reprendre</button>
       <button type="button" class="btn ghost" id="quitBtn">Abandonner</button>
     </div>
+  </div>
+</div>
+
+<div id="garage" class="overlay garage" hidden>
+  <div class="panel">
+    <p class="eyebrow">Atelier du pénitencier</p>
+    <h2>GARAGE</h2>
+    <div class="gsec"><span class="lbl">VÉHICULE</span><div class="seg" id="gCar" role="group" aria-label="Véhicule"></div><p class="note" id="gCarDesc"></p><dl class="gstats" id="gCarStats"></dl></div>
+    <div class="gsec"><span class="lbl">TOURELLE</span><div class="seg" id="gGun" role="group" aria-label="Tourelle"></div><p class="note" id="gGunDesc"></p><dl class="gstats" id="gGunStats"></dl></div>
+    <div class="gsec"><span class="lbl">ROQUETTES · CLIC DROIT</span><div class="seg" id="gRocket" role="group" aria-label="Roquettes"></div><p class="note" id="gRocketDesc"></p><dl class="gstats" id="gRocketStats"></dl></div>
+    <div class="gsec"><span class="lbl">PEINTURE</span><div class="swatches" id="gColor" role="group" aria-label="Couleur"></div></div>
+    <div class="row"><button type="button" class="btn" id="garageDone">Terminé</button></div>
   </div>
 </div>
 
@@ -851,7 +886,12 @@ const sfx = (() => {
       eng.f.frequency.setTargetAtTime(380 + Math.abs(speed) * 26 + (turbo ? 600 : 0), t, 0.08);
       eng.g.gain.setTargetAtTime(on ? 0.055 : 0, t, 0.15);
     },
-    mg(x, z, mine) { if (budget-- <= 0) return; const v = mine ? 1 : vol(x, z, 70) * 0.7; noise(0.07, 3200, 700, 0.16 * v, 'bandpass', 0.9); if (mine) tone(140, 0.05, 0.05, 'square', 60); },
+    mg(x, z, mine, kind) {
+      if (budget-- <= 0) return; const v = mine ? 1 : vol(x, z, 70) * 0.7;
+      if (kind === 'cannon') { noise(0.3, 900, 90, 0.38 * v, 'lowpass', 0.8); tone(95, 0.22, 0.12 * v, 'sine', 45); return; }
+      if (kind === 'shotgun') { noise(0.2, 2400, 300, 0.32 * v, 'lowpass', 0.7); return; }
+      noise(0.07, 3200, 700, 0.16 * v, 'bandpass', 0.9); if (mine) tone(140, 0.05, 0.05, 'square', 60);
+    },
     rocket(x, z) { noise(0.6, 500, 3000, 0.22 * vol(x, z, 90), 'bandpass', 1.5); },
     boom(x, z, big) { const v = vol(x, z, 140); noise(1.2 * big, 1100, 40, 0.75 * v, 'lowpass', 0.7); tone(70, 0.5, 0.25 * v, 'sine', 30); },
     thud(x, z, k) { noise(0.18, 700, 150, clamp(k, 0.05, 0.4) * vol(x, z, 50), 'lowpass'); },
@@ -887,12 +927,18 @@ function buildCar(def) {
   box(2.45, 0.45, 0.25, steel, 0, 0.82, -2.22);
   for (const s of [-1, 1]) {
     box(0.12, 0.5, 3.2, steel, s * 1.2, 0.88, 0);
-    const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.1, 10), steel); pod.rotation.x = PI / 2; pod.position.set(s * 0.82, 1.5, 1.05); body.add(pod);
+    if (def.rocket === 'salvo') { box(0.5, 0.42, 1.0, steel, s * 0.8, 1.52, 1.0); box(0.4, 0.3, 0.04, dark, s * 0.8, 1.52, 1.51); }
+    else {
+      const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.1, 10), steel); pod.rotation.x = PI / 2; pod.position.set(s * 0.82, 1.5, 1.05); body.add(pod);
+      if (def.rocket === 'homing') box(0.36, 0.06, 0.36, dark, s * 0.82, 1.74, 0.85);
+    }
     box(0.42, 0.16, 0.06, head, s * 0.78, 0.98, 2.44);
     box(0.5, 0.14, 0.05, tail, s * 0.75, 0.98, -2.36);
   }
   for (const x of [-0.8, 0, 0.8]) { const sp = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.55, 6), steel); sp.rotation.x = PI / 2; sp.position.set(x, 0.8, 2.66); body.add(sp); }
   if (def.mine) box(0.5, 0.05, 4.32, M(0x15110a, { roughness: 0.5 }), 0, 1.17, 0);
+  if (def.car === 'scout') { box(2.0, 0.08, 0.5, paint, 0, 1.55, -2.0); for (const s of [-1, 1]) box(0.08, 0.38, 0.4, dark, s * 0.8, 1.35, -2.0); }
+  if (def.car === 'heavy') { for (const s of [-1, 1]) box(0.22, 0.7, 3.6, steel, s * 1.28, 0.95, 0); box(2.8, 0.7, 0.4, steel, 0, 0.82, 2.35); box(1.9, 0.12, 2.0, steel, 0, 1.82, -0.45); }
   const wheels = [];
   for (const [x, z, front] of [[-1.18, 1.4, 1], [1.18, 1.4, 1], [-1.18, -1.45, 0], [1.18, -1.45, 0]]) {
     const piv = new THREE.Group(); piv.position.set(x, 0.55, z); g.add(piv);
@@ -902,8 +948,10 @@ function buildCar(def) {
   const tur = new THREE.Group(); tur.position.set(0, 1.78, -0.45); g.add(tur);
   tur.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 0.32, 12), dark));
   const gun = new THREE.Group(); gun.position.y = C.GUN_Y - 1.78; tur.add(gun);
-  box(0.62, 0.36, 0.75, steel, 0, 0, 0.15, gun);
-  for (const s of [-1, 1]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.5, 6), dark); b.rotation.x = PI / 2; b.position.set(s * 0.13, 0, 0.95); gun.add(b); }
+  const barrel = (rad, len, x, z) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, len, 8), dark); b.rotation.x = PI / 2; b.position.set(x, 0, z); gun.add(b); };
+  if (def.gun === 'cannon') { box(0.72, 0.44, 0.95, steel, 0, 0, 0.1, gun); barrel(0.14, 2.4, 0, 1.6); box(0.34, 0.34, 0.32, steel, 0, 0, 2.8, gun); }
+  else if (def.gun === 'shotgun') { box(0.86, 0.42, 0.7, steel, 0, 0, 0.1, gun); for (const s of [-1, 1]) barrel(0.13, 0.95, s * 0.17, 0.85); }
+  else { box(0.62, 0.36, 0.75, steel, 0, 0, 0.15, gun); for (const s of [-1, 1]) barrel(0.07, 1.5, s * 0.13, 0.95); }
   const sh = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 6), shadowMat); sh.rotation.x = -PI / 2; sh.position.y = 0.04; g.add(sh);
   const bubble = new THREE.Mesh(bubbleGeo, new THREE.MeshBasicMaterial({ color: 0x4aa8ff, transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending }));
   bubble.scale.set(1.9, 1.35, 3.0); bubble.position.y = 1.1; bubble.visible = false; g.add(bubble);
@@ -913,6 +961,7 @@ function buildCar(def) {
   mats.length = 0;
   for (const m of [bodyMat, turMat, gunMat]) mats.push({ m, c: 0xffffff, e: 0 });
   mats.push({ m: tire, c: 0x0d0d0e, e: 0 });
+  if (def.car === 'scout') g.scale.set(0.93, 0.9, 0.95); else if (def.car === 'heavy') g.scale.set(1.08, 1.05, 1.07);
   scene.add(g);
   return { g, body, tur, gun, wheels, mats, bubble };
 }
@@ -971,7 +1020,7 @@ function makeLabel(c) {
   c.label = { cvs, tex, sp, last: -1 };
 }
 function drawLabel(c, armor) {
-  const a = Math.max(0, Math.ceil(armor)); if (a === c.label.last) return; c.label.last = a;
+  const a = Math.max(0, Math.ceil(armor / (c.maxArmor || 100) * 100)); if (a === c.label.last) return; c.label.last = a;
   const g = c.label.cvs.getContext('2d');
   g.clearRect(0, 0, 256, 64);
   g.font = '700 26px "Saira Condensed", "Arial Narrow", sans-serif'; g.textAlign = 'center';
@@ -1038,8 +1087,85 @@ function onMsg(m) {
   else if (m.t === 'notice') { $('slotsNote').textContent = m.txt; }
 }
 function showOnly(id) {
-  for (const o of ['join', 'lobby', 'results', 'netErr', 'pause']) $(o).hidden = o !== id;
+  for (const o of ['join', 'lobby', 'results', 'netErr', 'pause', 'garage']) $(o).hidden = o !== id;
 }
+
+/* ---------- loadout & garage ---------- */
+let loadout = (() => { try { return S.cleanLoadout(JSON.parse(store.get('ironcircuit.loadout') || '{}')); } catch (e) { return S.cleanLoadout({}); } })();
+const LO_ROCKET_HUD = { std: 'ROQUETTES', homing: 'GUIDÉES', salvo: 'SALVES' };
+let garageOpen = false, garageBack = 'join', previewCar = null;
+const SHOW = new THREE.Vector3(0, 0, -320);
+function saveLoadout() { store.set('ironcircuit.loadout', JSON.stringify(loadout)); if (!SOLO && myId !== null) wsSend({ t: 'loadout', l: loadout }); }
+function loadoutLine(l) { return S.CARS[l.car].name + ' · ' + S.GUNS[l.gun].name + ' · ' + S.ROCKETS[l.rocket].name; }
+function statRows(el, rows) {
+  el.textContent = '';
+  for (const [label, frac, text] of rows) {
+    const d = document.createElement('div'); d.className = 'gstat';
+    const dt = document.createElement('dt'); dt.textContent = label;
+    const dd = document.createElement('dd'); const bar = document.createElement('i'); bar.style.width = Math.round(35 + 65 * clamp(frac, 0, 1)) + '%'; dd.appendChild(bar);
+    const b = document.createElement('b'); b.textContent = text;
+    d.append(dt, dd, b); el.appendChild(d);
+  }
+}
+const span = (vals, v) => { const lo = Math.min(...vals), hi = Math.max(...vals); return hi > lo ? (v - lo) / (hi - lo) : 1; };
+function renderGarage() {
+  const segFill = (id, defs, key) => {
+    const el = $(id); el.textContent = '';
+    for (const k of Object.keys(defs)) {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = defs[k].name; b.setAttribute('aria-pressed', String(loadout[key] === k));
+      b.addEventListener('click', () => { loadout[key] = k; saveLoadout(); renderGarage(); });
+      el.appendChild(b);
+    }
+  };
+  segFill('gCar', S.CARS, 'car'); segFill('gGun', S.GUNS, 'gun'); segFill('gRocket', S.ROCKETS, 'rocket');
+  const car = S.CARS[loadout.car], gun = S.GUNS[loadout.gun], rk = S.ROCKETS[loadout.rocket];
+  const cars = Object.values(S.CARS), guns = Object.values(S.GUNS);
+  const dps = g => g.dmg * g.pellets * g.rate, range = g => g.speed * g.life;
+  $('gCarDesc').textContent = car.desc; $('gGunDesc').textContent = gun.desc; $('gRocketDesc').textContent = rk.desc;
+  statRows($('gCarStats'), [
+    ['Vitesse', span(cars.map(c => c.spd), car.spd), Math.round(C.BASE_MAX * car.spd * C.KMH) + ' km/h'],
+    ['Blindage', span(cars.map(c => c.armor), car.armor), car.armor + ' PV'],
+    ['Maniabilité', span(cars.map(c => c.steer), car.steer), Math.round(car.steer * 100) + ' %'],
+    ['Masse', span(cars.map(c => c.mass), car.mass), Math.round(car.mass * 100) + ' %']
+  ]);
+  statRows($('gGunStats'), [
+    ['Dégâts/s', span(guns.map(dps), dps(gun)), Math.round(dps(gun))],
+    ['Portée', span(guns.map(range), range(gun)), Math.round(range(gun)) + ' m'],
+    ['Rotation', span(guns.map(g => g.turn), gun.turn), Math.round(gun.turn * 180 / PI) + '°/s']
+  ]);
+  const rks = Object.values(S.ROCKETS), tot = k => k.dmg * (k.count || 1);
+  statRows($('gRocketStats'), [
+    ['Dégâts', span(rks.map(tot), tot(rk)), rk.count ? rk.count + ' × ' + rk.dmg : String(rk.dmg)],
+    ['Zone', span(rks.map(k => k.radius), rk.radius), rk.radius + ' m'],
+    ['Vitesse', span(rks.map(k => k.speed), rk.speed), Math.round(rk.speed * C.KMH) + ' km/h']
+  ]);
+  const sw = $('gColor'); sw.textContent = '';
+  for (const col of S.PALETTE) {
+    const b = document.createElement('button'); b.type = 'button'; b.style.background = hex(col); b.setAttribute('aria-label', 'Couleur ' + hex(col));
+    b.setAttribute('aria-pressed', String(loadout.color === col));
+    b.addEventListener('click', () => { loadout.color = col; saveLoadout(); renderGarage(); });
+    sw.appendChild(b);
+  }
+  if (garageOpen) buildPreview();
+}
+function buildPreview() {
+  const rot = previewCar ? previewCar.g.rotation.y : 0.6;
+  if (previewCar) scene.remove(previewCar.g);
+  previewCar = buildCar({ color: loadout.color, car: loadout.car, gun: loadout.gun, rocket: loadout.rocket });
+  previewCar.g.position.copy(SHOW); previewCar.g.rotation.y = rot;
+}
+function openGarage() {
+  garageBack = mode === 'lobby' ? 'lobby' : 'join';
+  garageOpen = true; renderGarage(); showOnly('garage');
+}
+function closeGarage() {
+  garageOpen = false; camera.clearViewOffset();
+  if (previewCar) { scene.remove(previewCar.g); previewCar = null; }
+  if (mode === 'join' || mode === 'lobby') showOnly(garageBack);
+}
+$('garageBtnSolo').addEventListener('click', openGarage);
+$('garageBtnLobby').addEventListener('click', openGarage);
+$('garageDone').addEventListener('click', closeGarage);
 
 /* ---------- lobby ---------- */
 const segBtns = document.querySelectorAll('#lobbySeg button');
@@ -1061,7 +1187,7 @@ $('joinForm').addEventListener('submit', e => {
   if (!name) { $('nameInput').focus(); return; }
   store.set('ironcircuit.name', name);
   sfx.init();
-  wsSend({ t: 'hello', name });
+  wsSend({ t: 'hello', name, loadout });
 });
 function onLobby(m) {
   lastLobby = m; hostId = m.host;
@@ -1072,10 +1198,11 @@ function onLobby(m) {
   m.players.forEach((p, i) => {
     const racer = !p.spec && nRacers < C.MAX_CARS; if (racer) nRacers++;
     const li = document.createElement('li');
-    const dot = document.createElement('i'); dot.style.background = hex(S.COLORS[p.color]);
+    const dot = document.createElement('i'); dot.style.background = hex(p.color);
     const nm = document.createElement('span'); nm.textContent = p.name;
     const tag = document.createElement('small');
     tag.textContent = [p.id === m.host ? 'HÔTE' : '', p.id === myId ? 'TOI' : '', !racer ? 'SPECTATEUR' : ''].filter(Boolean).join(' · ');
+    if (p.loadout) { const lo = document.createElement('span'); lo.className = 'lo'; lo.textContent = loadoutLine(p.loadout); tag.appendChild(lo); }
     li.append(dot, nm, tag); ul.appendChild(li);
   });
   const ai = m.ai === 'none' ? 0 : Math.max(0, C.MAX_CARS - nRacers);
@@ -1101,7 +1228,7 @@ function onLobby(m) {
   $('startBtn').hidden = !isHost; $('waitNote').hidden = isHost;
   $('backBtn').hidden = !isHost; $('resWait').hidden = isHost;
   if (myId === null) return;
-  if (m.phase === 'lobby') { setMap(m.mode); endRaceView(); mode = 'lobby'; showOnly('lobby'); }
+  if (m.phase === 'lobby') { setMap(m.mode); endRaceView(); mode = 'lobby'; if (!garageOpen) showOnly('lobby'); else garageBack = 'lobby'; }
   else if (m.phase === 'race' && mode === 'join') { showOnly(null); }
   else if (m.phase === 'results' && mode === 'join') { mode = 'lobby'; showOnly('lobby'); }
 }
@@ -1109,18 +1236,21 @@ function onLobby(m) {
 /* ---------- race ---------- */
 const standRows = [];
 function onStart(m) {
+  if (garageOpen) closeGarage();
   setMap(m.mode);
   clearWorld();
   for (const c of cars) scene.remove(c.g);
   spectator = !!m.spectator;
   cars = m.cars.map(ci => {
     const mine = !spectator && ci.pid === myId;
-    const c = Object.assign(buildCar({ color: ci.color, mine }), ci, { mine, st: null, smokeEmit: 0, lastLap: 0 });
+    const lo = ci.loadout || S.cleanLoadout({});
+    const c = Object.assign(buildCar({ color: ci.color, mine, car: lo.car, gun: lo.gun, rocket: lo.rocket }), ci, { mine, st: null, smokeEmit: 0, lastLap: 0, loadout: lo, maxArmor: ci.maxArmor || 100 });
     if (!mine) makeLabel(c);
     return c;
   });
   myCar = cars.find(c => c.mine) || null;
   $('posBox').querySelector('small').textContent = '/' + cars.length;
+  if (myCar) $('slotRocket').querySelector('.lbl').textContent = LO_ROCKET_HUD[myCar.loadout.rocket];
   curSnap = null; snaps = []; clockOff = null; pending.length = 0; pc.valid = false; stepAcc = 0;
   H.standings.textContent = ''; standRows.length = 0;
   for (const c of cars) {
@@ -1161,7 +1291,7 @@ function onSnap(m) {
   for (const r of m.r) {
     seenR.add(r[0]);
     let o = rocketObjs.get(r[0]);
-    if (!o) { const mesh = new THREE.Mesh(rocketGeo, rocketMat); mesh.rotation.order = 'YXZ'; mesh.rotation.set(PI / 2, r[3], 0); mesh.position.set(r[1], r[4] || 1.5, r[2]); scene.add(mesh); o = { m: mesh }; rocketObjs.set(r[0], o); }
+    if (!o) { const mesh = new THREE.Mesh(rocketGeo, rocketMat); mesh.rotation.order = 'YXZ'; mesh.rotation.set(PI / 2, r[3], 0); mesh.position.set(r[1], r[4] || 1.5, r[2]); if (r[5]) mesh.scale.setScalar(0.6); scene.add(mesh); o = { m: mesh }; rocketObjs.set(r[0], o); }
   }
   for (const [id, o] of rocketObjs) if (!seenR.has(id)) { scene.remove(o.m); rocketObjs.delete(id); }
   const seenM = new Set();
@@ -1196,9 +1326,14 @@ function handleEvent(e) {
     case 'armed': if (myCar) feed('Armes activées', 'good'); break;
     case 'mg': {
       const t = tracers[tracerIdx]; tracerIdx = (tracerIdx + 1) % tracers.length;
-      Object.assign(t, { on: true, id: e.id, x: e.x, y: e.y, z: e.z, vx: e.vx, vy: e.vy, vz: e.vz, life: 0.45 });
-      fx.spawn(e.x, e.y, e.z, 0, 0, 0, 0.05, 1.1, 0.6, 0xffc060, 1);
-      sfx.mg(e.x, e.z, mine(e.c));
+      const gk = e.g || 'mg', ti = tracers.indexOf(t);
+      Object.assign(t, { on: true, id: e.id, x: e.x, y: e.y, z: e.z, vx: e.vx, vy: e.vy, vz: e.vz, life: e.l || 0.45, len: gk === 'cannon' ? 5 : gk === 'shotgun' ? 1.2 : 2.4 });
+      trCol.set(gk === 'cannon' ? [1, 1, 0.85, 1, 0.6, 0.2] : gk === 'shotgun' ? [1, 0.75, 0.4, 0.8, 0.35, 0.15] : [1, 0.9, 0.6, 0.9, 0.45, 0.25], ti * 6); trGeo.attributes.color.needsUpdate = true;
+      if (!e.k) {
+        fx.spawn(e.x, e.y, e.z, 0, 0, 0, gk === 'mg' ? 0.05 : 0.09, gk === 'mg' ? 1.1 : 2.2, 0.6, 0xffc060, 1);
+        sfx.mg(e.x, e.z, mine(e.c), gk);
+        if (gk === 'cannon' && mine(e.c)) addShake(e.x, e.z, 0.18, 10);
+      }
       if (mine(e.c)) perf.shots++;
       break;
     }
@@ -1245,6 +1380,7 @@ function handleEvent(e) {
       break;
     }
     case 'left': feed('Plus que ' + e.s + ' s', 'bad'); break;
+    case 'locked': if (mine(e.t)) { feed('Roquette guidée sur toi : esquive !', 'bad'); sfx.beep(true); } break;
     case 'vent':
       if (e.p === 1 && myCar && myCar.st && (myCar.st.y || 0) > 2.5) { feed('Les grilles chauffent : quitte la plateforme !', 'bad'); sfx.overheat(); }
       break;
@@ -1329,10 +1465,42 @@ canvas.addEventListener('mousedown', e => {
   sfx.init();
   if (!document.pointerLockElement) lockPointer();
   if (e.button === 0) { mouseDown = true; perf.clicks++; }
-  if (e.button === 2) rocketCount++;
+  if (e.button === 2) {
+    if (myCar && myCar.loadout.rocket === 'homing') { lockHold = true; lockT = 0; lockId = -1; }
+    else { lockFire = -1; rocketCount++; }
+  }
   e.preventDefault();
 });
-addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; });
+addEventListener('mouseup', e => {
+  if (e.button === 0) mouseDown = false;
+  if (e.button === 2 && lockHold) {
+    lockHold = false;
+    lockFire = lockT >= S.ROCKETS.homing.lock && lockId >= 0 ? lockId : -1;
+    rocketCount++; lockId = -1; lockT = 0;
+  }
+});
+// Guided rockets: hold right click on a car near the crosshair; it locks after 0.6 s.
+let lockHold = false, lockT = 0, lockId = -1, lockFire = -1;
+const lockEl = $('lockMark'), lockV = new THREE.Vector3();
+function updateLock(dt) {
+  if (!lockHold || !myCar || !myCar.st || !myCar.st.alive || mode !== 'race') { lockEl.hidden = true; if (!myCar || mode !== 'race') lockHold = false; return; }
+  const me = myCar.st, cx = innerWidth / 2, cy = innerHeight / 2;
+  let best = null, bd = innerHeight * 0.3, bx = 0, by = 0;
+  for (const c of cars) {
+    if (c === myCar || !c.st || !c.st.alive) continue;
+    if (Math.hypot(c.st.x - me.x, c.st.z - me.z) > S.ROCKETS.homing.range) continue;
+    lockV.set(c.st.x, (c.st.y || 0) + 1.1, c.st.z).project(camera);
+    if (lockV.z > 1) continue;
+    const sx = (lockV.x + 1) / 2 * innerWidth, sy = (1 - lockV.y) / 2 * innerHeight, d = Math.hypot(sx - cx, sy - cy);
+    if (d < bd) { bd = d; best = c; bx = sx; by = sy; }
+  }
+  if (!best) { lockId = -1; lockT = 0; lockEl.hidden = true; return; }
+  if (best.id === lockId) lockT += dt; else { lockId = best.id; lockT = 0; }
+  const done = lockT >= S.ROCKETS.homing.lock, k = done ? 1 : 1.7 - 0.7 * lockT / S.ROCKETS.homing.lock;
+  lockEl.hidden = false; lockEl.classList.toggle('locked', done);
+  lockEl.style.transform = 'translate(' + bx.toFixed(1) + 'px,' + by.toFixed(1) + 'px) scale(' + k.toFixed(2) + ')';
+  lockEl.querySelector('span').textContent = done ? 'VERROUILLÉ · RELÂCHE' : 'VERROUILLAGE…';
+}
 addEventListener('contextmenu', e => { if (e.target === canvas || driving()) e.preventDefault(); });
 const k = c => keys.has(c);
 function readInput() {
@@ -1344,7 +1512,7 @@ function readInput() {
     dr: k('Space') ? 1 : 0,
     tu: k('ShiftLeft') || k('ShiftRight') ? 1 : 0,
     fi: mouseDown ? 1 : 0,
-    ay: r3(aimYaw), ap: r3(aimPitch)
+    ay: r3(aimYaw), ap: r3(aimPitch), lk: lockFire
   };
 }
 document.addEventListener('pointerlockchange', () => {
@@ -1419,6 +1587,7 @@ function reconcile(m) {
   Object.assign(pc, {
     x: row[F.x], z: row[F.z], h, vF, vL, vx: Math.sin(h) * vF + Math.cos(h) * vL, vz: Math.cos(h) * vF - Math.sin(h) * vL,
     steerSm: row[F.steer], nitro: row[F.nitro], oil: row[F.oil], oilSpin: row[F.oilSpin], speedMul: 1, alive: true,
+    spd: S.CARS[myCar.loadout.car].spd, steerK: S.CARS[myCar.loadout.car].steer, accK: S.CARS[myCar.loadout.car].acc,
     drifting: !!(fl & FL.drifting), turboOn: !!(fl & FL.turbo), progress: 0,
     y: row[F.y] || 0, vy: row[F.vy] || 0, air: !!(fl & FL.air)
   });
@@ -1497,6 +1666,7 @@ function interp(now) {
     const rb = B.r.find(r => r[0] === id) || curSnap.r.find(r => r[0] === id);
     if (!rb) continue;
     const ra = A.r.find(r => r[0] === id) || rb;
+    o.m.rotation.y = ra[3] + wrapA(rb[3] - ra[3]) * a;
     o.m.position.set(ra[1] + (rb[1] - ra[1]) * a, (ra[4] || 1.5) + ((rb[4] || 1.5) - (ra[4] || 1.5)) * a, ra[2] + (rb[2] - ra[2]) * a);
   }
 }
@@ -1542,7 +1712,7 @@ function updateVisuals(dt, time) {
     const t = tracers[k], o = k * 6;
     if (t.on) { t.x += t.vx * dt; t.y += t.vy * dt; t.z += t.vz * dt; t.life -= dt; if (t.life <= 0) t.on = false; }
     if (!t.on) { trPos.fill(0, o, o + 6); continue; }
-    const inv = 2.4 / (Math.hypot(t.vx, t.vy, t.vz) || 1);
+    const inv = (t.len || 2.4) / (Math.hypot(t.vx, t.vy, t.vz) || 1);
     trPos[o] = t.x; trPos[o + 1] = t.y; trPos[o + 2] = t.z;
     trPos[o + 3] = t.x - t.vx * inv; trPos[o + 4] = t.y - t.vy * inv; trPos[o + 5] = t.z - t.vz * inv;
   }
@@ -1655,7 +1825,7 @@ function updateHUD(dt) {
     rank.forEach((c, i) => {
       const r = standRows.find(s => s.c === c);
       r.rk.textContent = i + 1;
-      r.tag.textContent = !c.st.alive ? 'KO' : MODE === 'arena' ? c.st.kills + ' pts' : c.st.finished ? 'ARRIVÉ' : Math.max(0, Math.ceil(c.st.armor)) + '%';
+      r.tag.textContent = !c.st.alive ? 'KO' : MODE === 'arena' ? c.st.kills + ' pts' : c.st.finished ? 'ARRIVÉ' : Math.max(0, Math.ceil(c.st.armor / (c.maxArmor || 100) * 100)) + '%';
       r.li.classList.toggle('out', !c.st.alive);
       H.standings.appendChild(r.li);
     });
@@ -1671,10 +1841,10 @@ function updateHUD(dt) {
   $('hLapLbl').textContent = arena ? 'SCORE' : 'TOUR';
   H.lap.textContent = arena ? p.kills + '/' + C.ARENA_KILLS : Math.min(LAPS, Math.max(1, Math.floor(p.progress / N) + 1)) + '/' + LAPS;
   H.time.textContent = fmtTime(arena ? left : p.finished ? p.finishTime : rt);
-  const a = Math.max(0, Math.ceil(p.armor));
-  H.armor.style.width = a + '%'; H.armor.classList.toggle('low', a <= 30); H.armorN.textContent = a + (p.shield > 0 ? ' +' + p.shield + ' · ' + Math.ceil(p.shieldT) + ' s' : '');
+  const a = Math.max(0, Math.ceil(p.armor)), mx = myCar.maxArmor || 100, pct = a / mx * 100;
+  H.armor.style.width = pct + '%'; H.armor.classList.toggle('low', pct <= 30); H.armorN.textContent = a + (p.shield > 0 ? ' +' + p.shield + ' · ' + Math.ceil(p.shieldT) + ' s' : '');
   H.armorN.classList.toggle('shb', p.shield > 0);
-  $('hShield').style.width = (p.shield || 0) + '%';
+  $('hShield').style.width = Math.min(100, (p.shield || 0) / mx * 100) + '%';
   $('hShieldT').style.width = (p.shield > 0 ? p.shieldT / 15 * 100 : 0) + '%';
   H.nitro.style.width = (p.nitro * 100).toFixed(0) + '%'; H.nitroN.textContent = (p.nitro * 100).toFixed(0);
   H.speed.textContent = Math.round(Math.abs(p.vF) * C.KMH);
@@ -1769,6 +1939,17 @@ function updateCamera(dt, time) {
     listener.x = p.x; listener.z = p.z;
     return;
   }
+  // garage: slow turntable around the car being configured, shifted to the right of the panel
+  if (garageOpen) {
+    if (previewCar) previewCar.g.rotation.y += dt * 0.5;
+    const a = 0.9;
+    camPos.set(SHOW.x + Math.sin(a) * 11, 3.6, SHOW.z + Math.cos(a) * 11);
+    camera.position.copy(camPos); camLook.set(SHOW.x, 1.0, SHOW.z); camera.lookAt(camLook);
+    camera.fov = 45; camera.updateProjectionMatrix();
+    if (innerWidth > 800) camera.setViewOffset(innerWidth, innerHeight, -innerWidth * 0.2, 0, innerWidth, innerHeight); else camera.clearViewOffset();
+    sodiumLamp.position.set(SHOW.x + 3, 9, SHOW.z + 3);
+    return;
+  }
   // orbit: race leader after the race, start line in menus
   const lead = (mode === 'race' || mode === 'results') && cars.length && cars[0].st ? ranking()[0].st : null;
   const preview = !lead && MODE === 'arena';   // menus: slow tour of the selected map
@@ -1801,7 +1982,7 @@ function renderBest() {
 }
 function soloStart() {
   sfx.init();
-  local.race = S.createRace(soloMode === 'arena' ? AR : T, { humans: [{ id: 1, name: 'TOI', color: 0 }], diff: soloDiff, ai: soloAi ? C.MAX_CARS : 0 });
+  local.race = S.createRace(soloMode === 'arena' ? AR : T, { humans: [{ id: 1, name: 'TOI', loadout }], diff: soloDiff, ai: soloAi ? C.MAX_CARS : 0 });
   local.acc = 0; local.paused = false; local.ending = false; local.rk = rocketCount; local.re = rearCount;
   myId = 1;
   onStart({ cars: local.race.info(), spectator: false, mode: soloMode });
@@ -1815,7 +1996,7 @@ function soloTick(dt) {
   while (L.acc >= 1 / 60) {
     const inp = {};
     if (myCar) {
-      inp[myCar.id] = Object.assign(readInput(), { rk: rocketCount > L.rk, re: rearCount > L.re });
+      inp[myCar.id] = Object.assign(readInput(), { rk: rocketCount > L.rk, re: rearCount > L.re, lk: lockFire });
       L.rk = rocketCount; L.re = rearCount;
     }
     L.race.step(1 / 60, inp);
@@ -1981,7 +2162,7 @@ function frame(now) {
   updateVisuals(dt, time);
   updateCamera(dt, time);
   if (mode === 'race') {
-    updateAim(); updateGunMark(); updateHUD(dt);
+    updateAim(); updateGunMark(); updateHUD(dt); updateLock(dt);
     const p = myCar && myCar.st;
     sfx.engine(p ? p.vF : 0, p && p.turbo, !!(p && p.alive && !p.finished));
   }

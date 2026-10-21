@@ -106,7 +106,7 @@ function currentMode() {
 }
 function lobbyState() {
   const h = host();
-  return { t: 'lobby', phase, diff, addrs: lanAddresses().map(ip => 'http://' + ip + ':' + PORT), host: h ? h.id : null, players: players().map(p => ({ id: p.id, name: p.name, color: p.color, spec: p.spec, vote: p.vote })), results,
+  return { t: 'lobby', phase, diff, addrs: lanAddresses().map(ip => 'http://' + ip + ':' + PORT), host: h ? h.id : null, players: players().map(p => ({ id: p.id, name: p.name, color: p.loadout.color, loadout: p.loadout, spec: p.spec, vote: p.vote })), results,
     mode: currentMode(), decide, ai: aiFill ? 'fill' : 'none' };
 }
 function broadcastLobby() { broadcast(lobbyState()); }
@@ -124,9 +124,7 @@ function onMessage(cl, txt) {
     let name = cleanName(m.name);
     const taken = new Set(players().map(p => p.name));
     for (let n = 2; taken.has(name); n++) name = cleanName(m.name).slice(0, 12) + ' ' + n;
-    const used = new Set(players().map(p => p.color));
-    let color = 0; while (used.has(color) && color < 5) color++;
-    Object.assign(cl, { joined: true, name, color });
+    Object.assign(cl, { joined: true, name, loadout: Sim.cleanLoadout(m.loadout) });
     console.log('  + ' + name + ' a rejoint la partie');
     send(cl, { t: 'welcome', id: cl.id, name });
     broadcastLobby();
@@ -142,8 +140,10 @@ function onMessage(cl, txt) {
     if (typeof m.ap === 'number' && isFinite(m.ap)) i.ap = m.ap;
     cl.queue.push(i);
     if (cl.queue.length > 8) cl.queue.splice(0, cl.queue.length - 4);
-    if (typeof m.rk === 'number' && m.rk > cl.rk) { cl.rk = m.rk; cl.wantRocket = true; }
+    if (typeof m.rk === 'number' && m.rk > cl.rk) { cl.rk = m.rk; cl.wantRocket = true; cl.wantLock = Number.isInteger(m.lk) ? m.lk : -1; }
     if (typeof m.re === 'number' && m.re > cl.re) { cl.re = m.re; cl.wantRear = true; }
+  } else if (m.t === 'loadout') {
+    cl.loadout = Sim.cleanLoadout(m.l); broadcastLobby();
   } else if (m.t === 'mode' && phase !== 'race' && MODES.includes(m.m)) {
     cl.vote = m.m;
     if (isHost) hostMode = m.m;
@@ -169,7 +169,7 @@ function startRace() {
   const racers = players().filter(p => !p.spec).slice(0, Sim.C.MAX_CARS);
   if (!racers.length) { send(host(), { t: 'notice', txt: 'Il faut au moins un pilote pour lancer la course.' }); return; }
   const mode = currentMode();
-  race = Sim.createRace(mode === 'arena' ? A : T, { humans: racers.map(p => ({ id: p.id, name: p.name, color: p.color })), diff, ai: aiFill ? Sim.C.MAX_CARS : 0 });
+  race = Sim.createRace(mode === 'arena' ? A : T, { humans: racers.map(p => ({ id: p.id, name: p.name, loadout: p.loadout })), diff, ai: aiFill ? Sim.C.MAX_CARS : 0 });
   for (const p of players()) { p.input = {}; p.queue = []; p.ack = 0; p.wantRocket = p.wantRear = false; }
   phase = 'race'; finishDeadline = null; results = null; ending = false;
   broadcastLobby();
@@ -213,7 +213,7 @@ function serverTick(now) {
       const car = race.cars.find(c => c.pid === p.id && c.human);
       if (!car) continue;
       if (p.queue.length) { p.input = p.queue.shift(); p.ack = p.input.sq; }
-      inputs[car.id] = Object.assign({}, p.input, { rk: p.wantRocket, re: p.wantRear });
+      inputs[car.id] = Object.assign({}, p.input, { rk: p.wantRocket, lk: p.wantLock, re: p.wantRear });
       p.wantRocket = p.wantRear = false;
     }
     race.step(STEP, inputs); load.steps++;

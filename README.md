@@ -139,14 +139,40 @@ Le décor du mode choisi s'affiche en fond du salon.
 - Les **tonneaux rouges** explosent quand on leur tire dessus (et les explosions se
   propagent). Ils réapparaissent 20 secondes plus tard.
 
+### Garage : voiture et armes
+
+Le bouton **Garage** (menu solo et salon LAN) ouvre l'atelier. La voiture choisie tourne
+en fond pendant que tu la configures, et le choix est mémorisé dans le navigateur.
+Les IA reçoivent des configurations au hasard.
+
+| Véhicule | Vitesse | Blindage | Maniabilité | Masse | En bref |
+|---|---|---|---|---|---|
+| **Furet** | 105 % | 80 | 112 % | 85 % | Le plus rapide en course, fragile en arène |
+| **Rôdeur** | 100 % | 100 | 100 % | 100 % | L'équilibre |
+| **Mastodonte** | 95 % | 125 | 90 % | 140 % | Lent mais solide, pousse les autres |
+
+| Tourelle | Dégâts/s | Portée | Rotation | En bref |
+|---|---|---|---|---|
+| **Mitrailleuse** | 26 | 74 m | rapide | Polyvalente, surchauffe en tir prolongé |
+| **Canon** | 24 | 100 m | lente | Obus précis et lourds, longue portée |
+| **Fusil à pompe** | 29 | 30 m | très rapide | 7 plombs en cône, dévastateur au contact |
+
+| Roquettes (clic droit) | Dégâts | Zone | En bref |
+|---|---|---|---|
+| **Roquette** | 36 | 7 m | Tir droit devant |
+| **Roquette guidée** | 26 | 5 m | Maintiens le clic droit sur une voiture proche du viseur (≤ 100 m) : elle se verrouille en 0,6 s. Relâche pour tirer. La roquette est plus lente et vire peu : on peut l'esquiver en braquant fort. La cible est prévenue. Relâcher avant le verrouillage tire droit |
+| **Salve** | 4 × 13 | 3,5 m | Quatre mini-roquettes en éventail |
+
+**Peinture** : 8 couleurs. Deux joueurs peuvent choisir la même couleur.
+
 ### Commandes
 
 | Touche | Action |
 |---|---|
 | `Z Q S D` ou flèches | Conduire |
 | Souris | Viser : la tourelle suit (±75° de côté, ±10° en hauteur) |
-| Clic gauche | Mitrailleuse (surchauffe si tu tires trop longtemps) |
-| Clic droit | Roquette, tir droit devant |
+| Clic gauche | Tourelle (surchauffe si tu tires trop longtemps) |
+| Clic droit | Roquette (avec une roquette guidée : maintenir pour verrouiller, relâcher pour tirer) |
 | `Espace` | Dérapage |
 | `Maj` | Turbo |
 | `E` | Arme arrière : huile, mines ou fumée |

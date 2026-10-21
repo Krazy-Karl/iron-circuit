@@ -156,6 +156,24 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
 #perf h3{margin:6px 0 2px;font-size:11px;letter-spacing:.16em;color:var(--dim);font-weight:600}
 #perf h3:first-child{margin-top:0}
 #perf .verdict{margin-top:6px;padding-top:6px;border-top:1px solid var(--line);font-size:13px;line-height:1.35;color:var(--bone);font-weight:500}
+.garage{place-items:center start;background:linear-gradient(90deg,rgba(8,9,12,.9) 0,rgba(8,9,12,.75) 42%,rgba(8,9,12,0) 72%)}
+.garage .panel{max-width:520px;gap:14px}
+.gsec{display:grid;gap:8px}
+.gsec .seg{flex-wrap:wrap}
+.gstats{display:grid;gap:5px;margin:0}
+.gstat{display:grid;grid-template-columns:110px minmax(0,1fr) 64px;gap:10px;align-items:center;font-size:15px}
+.gstat dt{color:var(--dim)}
+.gstat dd{margin:0;height:8px;background:rgba(255,255,255,.08);position:relative}
+.gstat dd i{position:absolute;inset:0 auto 0 0;background:var(--sodium)}
+.gstat b{font-size:15px;text-align:right;font-variant-numeric:tabular-nums}
+.swatches{display:flex;flex-wrap:wrap;gap:8px}
+.swatches button{width:34px;height:34px;border:2px solid var(--line);cursor:pointer;padding:0}
+.swatches button[aria-pressed="true"]{border-color:var(--bone);box-shadow:0 0 0 2px var(--sodium)}
+#lockMark{position:fixed;left:0;top:0;width:54px;height:54px;margin:-27px 0 0 -27px;pointer-events:none;z-index:5;border:2px dashed var(--sodium);transform-origin:center}
+#lockMark.locked{border:3px solid var(--blood)}
+#lockMark span{position:absolute;top:58px;left:50%;transform:translateX(-50%);font-size:13px;font-weight:700;letter-spacing:.14em;white-space:nowrap;color:var(--sodium);text-shadow:0 1px 2px #000}
+#lockMark.locked span{color:var(--blood)}
+#players li small .lo{display:block;letter-spacing:.04em;color:var(--dim);font-size:12px}
 .settings{display:grid;gap:14px;padding-top:14px;border-top:1px solid var(--line)}
 .set{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center}
 .set label{font-size:16px}
@@ -214,6 +232,7 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
   <span id="crossTxt"></span>
 </div>
 <div id="gunMark" hidden></div>
+<div id="lockMark" hidden><span></span></div>
 <div id="perf" class="hud" hidden></div>
 <div id="countdown" hidden></div>
 
@@ -248,6 +267,7 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
     </div>
     <div class="row" id="soloStartRow" hidden>
       <button type="button" class="btn" id="soloStart">Démarrer la course</button>
+      <button type="button" class="btn ghost" id="garageBtnSolo">Garage</button>
       <span class="note" id="bestNote"></span>
     </div>
     <form id="joinForm" class="row" autocomplete="off">
@@ -316,6 +336,7 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
     </div>
     <div class="row">
       <button type="button" class="btn" id="startBtn">Lancer la course</button>
+      <button type="button" class="btn ghost" id="garageBtnLobby">Garage</button>
       <span class="note" id="waitNote">En attente de l’hôte pour lancer la course.</span>
     </div>
   </div>
@@ -348,6 +369,18 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
       <button type="button" class="btn" id="resumeBtn">Reprendre</button>
       <button type="button" class="btn ghost" id="quitBtn">Abandonner</button>
     </div>
+  </div>
+</div>
+
+<div id="garage" class="overlay garage" hidden>
+  <div class="panel">
+    <p class="eyebrow">Atelier du pénitencier</p>
+    <h2>GARAGE</h2>
+    <div class="gsec"><span class="lbl">VÉHICULE</span><div class="seg" id="gCar" role="group" aria-label="Véhicule"></div><p class="note" id="gCarDesc"></p><dl class="gstats" id="gCarStats"></dl></div>
+    <div class="gsec"><span class="lbl">TOURELLE</span><div class="seg" id="gGun" role="group" aria-label="Tourelle"></div><p class="note" id="gGunDesc"></p><dl class="gstats" id="gGunStats"></dl></div>
+    <div class="gsec"><span class="lbl">ROQUETTES · CLIC DROIT</span><div class="seg" id="gRocket" role="group" aria-label="Roquettes"></div><p class="note" id="gRocketDesc"></p><dl class="gstats" id="gRocketStats"></dl></div>
+    <div class="gsec"><span class="lbl">PEINTURE</span><div class="swatches" id="gColor" role="group" aria-label="Couleur"></div></div>
+    <div class="row"><button type="button" class="btn" id="garageDone">Terminé</button></div>
   </div>
 </div>
 
@@ -395,6 +428,28 @@ const DIFFS = {
 };
 const CTRL = [[-60,0],[60,0],[150,0],[200,20],[220,70],[200,120],[150,135],[110,170],[120,220],[170,250],[190,300],[150,345],[80,350],[20,320],[-10,260],[-60,230],[-120,250],[-170,220],[-190,160],[-160,100],[-180,50],[-150,5]];
 const COLORS = [0xff6a1a, 0x2f6fd6, 0xd8b02a, 0x2a9e6a, 0xc23a4a, 0x8a5ad8];
+// ---------- loadouts: car, turret, rockets, paint ----------
+const PALETTE = [0xff6a1a, 0x2f6fd6, 0xd8b02a, 0x2a9e6a, 0xc23a4a, 0x8a5ad8, 0xd9d6cf, 0x34373d];
+const CARS = {
+  scout:   { name: 'Furet',      desc: 'Léger et vif, mais fragile.',          spd: 1.05, armor: 80,  steer: 1.12, acc: 1.1,  mass: 0.85 },
+  prowler: { name: 'Rôdeur',     desc: 'L’équilibre entre vitesse et blindage.', spd: 1,    armor: 100, steer: 1,    acc: 1,    mass: 1 },
+  heavy:   { name: 'Mastodonte', desc: 'Lent mais très blindé, il pousse fort.', spd: 0.95, armor: 125, steer: 0.9,  acc: 0.9,  mass: 1.4 }
+};
+// rate: shots/s · dmg per bullet · heat per shot · pellets per shot · spread (rad) · bullet speed · life (s) · turret turn rate (rad/s)
+const GUNS = {
+  mg:      { name: 'Mitrailleuse',  desc: 'Polyvalente, tourelle rapide.',        rate: 13,  dmg: 2.0,  heat: 0.034, pellets: 1, spread: 0.025, speed: 165, life: 0.45, turn: 3.2 },
+  cannon:  { name: 'Canon',         desc: 'Précis et longue portée, tourelle lente.', rate: 2.2, dmg: 11, heat: 0.3,   pellets: 1, spread: 0.006, speed: 200, life: 0.5,  turn: 2.0 },
+  shotgun: { name: 'Fusil à pompe', desc: 'Dévastateur de près, inutile de loin.', rate: 1.6, dmg: 2.6, heat: 0.4,   pellets: 7, spread: 0.09,  speed: 150, life: 0.2,  turn: 3.6 }
+};
+const ROCKETS = {
+  std:    { name: 'Roquette',          desc: 'Tir droit devant, gros dégâts de zone.', dmg: 36, radius: 7,   speed: 92 },
+  homing: { name: 'Roquette guidée',   desc: 'Maintiens le clic droit pour verrouiller une cible, relâche pour tirer. Plus lente, moins forte, on peut l’esquiver.', dmg: 26, radius: 5, speed: 70, turn: 1.5, lock: 0.6, range: 100 },
+  salvo:  { name: 'Salve',             desc: 'Quatre mini-roquettes en éventail pour couvrir une zone.', dmg: 13, radius: 3.5, speed: 88, count: 4, spread: 0.15 }
+};
+function cleanLoadout(l) {
+  l = l || {};
+  return { car: CARS[l.car] ? l.car : 'prowler', gun: GUNS[l.gun] ? l.gun : 'mg', rocket: ROCKETS[l.rocket] ? l.rocket : 'std', color: PALETTE.includes(+l.color) ? +l.color : PALETTE[0] };
+}
 const AI_NAMES = ['RASOIR', 'BULLDOZER', 'VEUVE NOIRE', 'LE BOUCHER', 'KRYPTE', 'FERRAILLE'];
 const PAD_GROUPS = [160, 340, 520, 700, 880, 1060], PAD_LAT = [-6, 0, 6];
 const PAD_ORDER = [['rocket', 'rear', 'repair'], ['rear', 'repair', 'rocket'], ['repair', 'rocket', 'rear']];
@@ -627,7 +682,7 @@ function carPhysics(T, c, ctl, dt, onWall) {
   let vF = c.vx * Math.sin(c.h) + c.vz * Math.cos(c.h);
   const auth = Math.min(1, Math.abs(vF) / 6) * (vF < -0.5 ? -1 : 1);
   const hi = 1 - 0.2 * Math.min(1, Math.abs(vF) / 50);
-  c.h += c.steerSm * 2.3 * auth * hi * (ctl.drift ? 1.45 : 1) * (air ? 0.3 : 1) * dt;
+  c.h += c.steerSm * 2.3 * (c.steerK || 1) * auth * hi * (ctl.drift ? 1.45 : 1) * (air ? 0.3 : 1) * dt;
   if (c.oil > 0) { c.oil -= dt; c.h += c.oilSpin * dt; }
   c.h = wrapA(c.h);
   const fx = Math.sin(c.h), fz = Math.cos(c.h), sx = Math.cos(c.h), sz = -Math.sin(c.h);
@@ -636,8 +691,8 @@ function carPhysics(T, c, ctl, dt, onWall) {
   const turbo = !air && ctl.turbo && c.nitro > 0.02 && vF > 2 && ctl.throttle;
   if (turbo) c.nitro = Math.max(0, c.nitro - dt * 0.34);
   else c.nitro = Math.min(1, c.nitro + dt * (c.drifting ? 0.06 : 0.022));
-  const maxF = (C.BASE_MAX + (turbo ? 14 : 0)) * c.speedMul;
-  if (!air && ctl.throttle && vF < maxF) vF += (turbo ? 40 : 26) * dt;
+  const maxF = (C.BASE_MAX * (c.spd || 1) + (turbo ? 14 : 0)) * c.speedMul;
+  if (!air && ctl.throttle && vF < maxF) vF += (turbo ? 40 : 26) * (c.accK || 1) * dt;
   if (!air && ctl.brake) { if (vF > 0.5) vF -= 45 * dt; else vF = Math.max(-10, vF - 16 * dt); }
   if (!air && !ctl.throttle && !ctl.brake) vF -= vF * 0.55 * dt;
   vF -= vF * 0.06 * dt;
@@ -712,16 +767,21 @@ function createRace(T, opts) {
   const humans = (opts.humans || []).slice(0, C.MAX_CARS);
   const slots = [0, 1, 2, 3, 4, 5];
   for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
-  const usedColors = new Set(humans.map(h => h.color));
-  const freeColors = COLORS.map((c, i) => i).filter(i => !usedColors.has(i));
+  const hl = humans.map(h => cleanLoadout(h.loadout));
+  const usedColors = new Set(hl.map(l => l.color));
+  const freeColors = PALETTE.filter(c => !usedColors.has(c)).concat(PALETTE);
+  const pick = o => { const k = Object.keys(o); return k[Math.floor(Math.random() * k.length)]; };
   let aiN = 0;
   // opts.ai: how many AI cars may fill the grid (0 = humans only)
   const total = Math.max(1, Math.min(C.MAX_CARS, humans.length + (opts.ai === undefined ? C.MAX_CARS : opts.ai)));
   for (let k = 0; k < total; k++) {
     const h = humans[k];
+    const L = h ? hl[k] : { car: pick(CARS), gun: pick(GUNS), rocket: pick(ROCKETS), color: freeColors[aiN] };
+    const cd = CARS[L.car];
     const car = {
       id: k, slot: slots[k], human: !!h, pid: h ? h.id : null,
-      name: h ? h.name : AI_NAMES[aiN], color: COLORS[h ? h.color : freeColors[aiN]],
+      name: h ? h.name : AI_NAMES[aiN], color: L.color, loadout: L,
+      gun: GUNS[L.gun], rkt: ROCKETS[L.rocket], maxArmor: cd.armor, spd: cd.spd, steerK: cd.steer, accK: cd.acc, mass: cd.mass,
       ai: { lane: 0, laneTarget: 0, laneT: 0, seed: Math.random() * 100, blind: 0, target: null, retarget: 0, stuck: 0, reverse: 0, padLock: 0, trigger: 0 }
     };
     if (!h) aiN++;
@@ -733,7 +793,7 @@ function createRace(T, opts) {
     if (ARENA_MODE) {
       const sp = T.spawns[c.slot], h = Math.atan2(-sp[0], -sp[1]);
       Object.assign(c, {
-        idx: 0, prevIdx: 0, x: sp[0], z: sp[1], h, vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0, armor: 100, alive: true, y: 0, vy: 0, air: false, shield: 0, shieldT: 0, finished: false, finishTime: 0,
+        idx: 0, prevIdx: 0, x: sp[0], z: sp[1], h, vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0, armor: c.maxArmor, alive: true, y: 0, vy: 0, air: false, shield: 0, shieldT: 0, finished: false, finishTime: 0,
         progress: 0, nitro: 1, turboOn: false, rockets: 3, rear: null, rearN: 0, heat: 0, overheat: 0, lastShot: 9,
         fireCd: 0, rocketCd: 0, kills: 0, lastHitBy: null, turretYaw: h, aimYaw: h, turretPitch: 0, aimPitch: 0, oil: 0, oilSpin: 0,
         smokeT: 0, smokeEmit: 0, wreckT: 0, drifting: false, speedMul: 1, respawnT: 0, invuln: 0, deaths: 0, lap: 0
@@ -745,7 +805,7 @@ function createRace(T, opts) {
     const i = (N - 12 - row * 9 - (slot % 2) * 3 + N) % N;
     Object.assign(c, {
       idx: i, prevIdx: i, x: T.PX[i] + T.NX[i] * lane, z: T.PZ[i] + T.NZ[i] * lane, h: T.tangAng(i),
-      vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0, armor: 100, alive: true, y: 0, vy: 0, air: false, shield: 0, shieldT: 0, finished: false, finishTime: 0,
+      vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0, armor: c.maxArmor, alive: true, y: 0, vy: 0, air: false, shield: 0, shieldT: 0, finished: false, finishTime: 0,
       progress: i - N, nitro: 1, turboOn: false, rockets: 3, rear: null, rearN: 0, heat: 0, overheat: 0, lastShot: 9,
       fireCd: 0, rocketCd: 0, kills: 0, lastHitBy: null, turretYaw: T.tangAng(i), aimYaw: T.tangAng(i), turretPitch: 0, aimPitch: 0, oil: 0, oilSpin: 0,
       smokeT: 0, smokeEmit: 0, wreckT: 0, drifting: false, speedMul: 1, respawnT: 0, invuln: 0, deaths: 0, lap: 0
@@ -759,24 +819,41 @@ function createRace(T, opts) {
     const dx = Math.sin(c.turretYaw) * cp, dy = Math.sin(c.turretPitch), dz = Math.cos(c.turretYaw) * cp;
     return { x: c.x - fx * 0.45 + dx * 1.7, y: (c.y || 0) + C.GUN_Y + dy * 1.7, z: c.z - fz * 0.45 + dz * 1.7 };
   }
-  function fireMG(c, dmgMul) {
+  function fireGun(c, dmgMul) {
+    const g = c.gun;
     if (c.overheat > 0 || c.fireCd > 0) return;
-    c.fireCd = 1 / 13; c.lastShot = 0;
-    c.heat += 0.034;
+    c.fireCd = 1 / g.rate; c.lastShot = 0;
+    c.heat += g.heat;
     if (c.heat >= 1) { c.heat = 1; c.overheat = 2; ev({ e: 'heat', c: c.id }); }
-    const mz = muzzle(c), sp = c.human ? 0.025 : 0.05, yaw = c.turretYaw + rnd(-sp, sp), pitch = c.turretPitch + rnd(-sp, sp) * 0.5;
-    const cp = Math.cos(pitch);
-    const vx = Math.sin(yaw) * cp * 165 + c.vx, vy = Math.sin(pitch) * 165, vz = Math.cos(yaw) * cp * 165 + c.vz;
-    const id = R.nextId++;
-    R.bullets.push({ id, x: mz.x, y: mz.y, z: mz.z, vx, vy, vz, life: 0.45, owner: c, dmg: 2.0 * dmgMul, idx: c.idx });
-    ev({ e: 'mg', id, c: c.id, x: r2(mz.x), y: r2(mz.y), z: r2(mz.z), vx: r2(vx), vy: r2(vy), vz: r2(vz) });
+    const mz = muzzle(c), sp = c.human ? g.spread : g.spread * 1.6 + 0.02;
+    for (let k = 0; k < g.pellets; k++) {
+      const yaw = c.turretYaw + rnd(-sp, sp), pitch = c.turretPitch + rnd(-sp, sp) * 0.5, cp = Math.cos(pitch);
+      const vx = Math.sin(yaw) * cp * g.speed + c.vx, vy = Math.sin(pitch) * g.speed, vz = Math.cos(yaw) * cp * g.speed + c.vz;
+      const id = R.nextId++;
+      R.bullets.push({ id, x: mz.x, y: mz.y, z: mz.z, vx, vy, vz, life: g.life, owner: c, dmg: g.dmg * dmgMul, idx: c.idx });
+      ev({ e: 'mg', id, c: c.id, g: c.loadout.gun, k, x: r2(mz.x), y: r2(mz.y), z: r2(mz.z), vx: r2(vx), vy: r2(vy), vz: r2(vz), l: g.life });
+    }
   }
-  function fireRocket(c) {
+  // lockId: the car a guided rocket should chase (ignored if it is not a valid target)
+  function fireRocket(c, lockId) {
     if (c.rockets <= 0 || c.rocketCd > 0) { if (c.rockets <= 0) ev({ e: 'empty', c: c.id, w: 'rocket' }); return; }
     c.rockets--; c.rocketCd = 0.6;
-    const fx = Math.sin(c.h), fz = Math.cos(c.h), sp = 92 + Math.max(0, c.vF);
-    const side = (c.rockets % 2 ? 1 : -1) * 0.82, sx = Math.cos(c.h), sz = -Math.sin(c.h);
-    R.rockets.push({ id: R.nextId++, x: c.x + fx * 2.4 + sx * side, y: (c.y || 0) + 1.5, z: c.z + fz * 2.4 + sz * side, h: c.h, vx: fx * sp, vz: fz * sp, life: 2.2, owner: c, idx: c.idx });
+    const k = c.rkt, sp = k.speed + Math.max(0, c.vF), sx = Math.cos(c.h), sz = -Math.sin(c.h);
+    const launch = (yawOff, side, mini, target) => {
+      const h = c.h + yawOff, fx = Math.sin(h), fz = Math.cos(h);
+      R.rockets.push({ id: R.nextId++, x: c.x + Math.sin(c.h) * 2.4 + sx * side, y: (c.y || 0) + 1.5, z: c.z + Math.cos(c.h) * 2.4 + sz * side, h, vx: fx * sp, vz: fz * sp,
+        life: target ? 3.2 : 2.2, owner: c, idx: c.idx, dmg: k.dmg, radius: k.radius, mini, target, turn: k.turn || 0 });
+    };
+    if (k === ROCKETS.salvo) for (let n = 0; n < k.count; n++) launch((n / (k.count - 1) - 0.5) * 2 * k.spread, (n % 2 ? 1 : -1) * 0.82, true, null);
+    else {
+      let t = null;
+      if (k === ROCKETS.homing && typeof lockId === 'number') {
+        const o = R.cars[lockId];
+        if (o && o !== c && o.alive && Math.hypot(o.x - c.x, o.z - c.z) < k.range * 1.2 && Math.abs(wrapA(Math.atan2(o.x - c.x, o.z - c.z) - c.h)) < 1.3) t = o;
+      }
+      launch(0, (c.rockets % 2 ? 1 : -1) * 0.82, false, t);
+      if (t) ev({ e: 'locked', c: c.id, t: t.id });
+    }
     ev({ e: 'rocket', c: c.id, x: r2(c.x), y: r2(c.y || 0), z: r2(c.z) });
   }
   function useRear(c) {
@@ -792,7 +869,7 @@ function createRace(T, opts) {
   }
   function pickup(c, p) {
     if (p.type === 'rocket') { if (c.rockets >= 6) return false; c.rockets = Math.min(6, c.rockets + 2); }
-    else if (p.type === 'repair') { if (c.armor >= 100) return false; c.armor = Math.min(100, c.armor + 35); }
+    else if (p.type === 'repair') { if (c.armor >= c.maxArmor) return false; c.armor = Math.min(c.maxArmor, c.armor + 35); }
     else if (p.type === 'shield') { if (c.shield >= 45) return false; c.shield = 50; c.shieldT = 15; }
     else { c.rear = REAR_KEYS[Math.floor(Math.random() * 3)]; c.rearN = REAR_N[c.rear]; }
     ev({ e: 'pick', c: c.id, type: p.type, rear: c.rear, n: c.rearN });
@@ -826,7 +903,7 @@ function createRace(T, opts) {
         if (near > bd) { bd = near; best = sp; }
       }
       const h = Math.atan2(-best[0], -best[1]);
-      Object.assign(c, { x: best[0], z: best[1], h, vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0, armor: 100, alive: true, y: 0, vy: 0, air: false, shield: 0, shieldT: 0, invuln: 2, wreckT: 0, oil: 0, smokeT: 0, heat: 0, overheat: 0, rockets: Math.max(c.rockets, 1) });
+      Object.assign(c, { x: best[0], z: best[1], h, vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0, armor: c.maxArmor, alive: true, y: 0, vy: 0, air: false, shield: 0, shieldT: 0, invuln: 2, wreckT: 0, oil: 0, smokeT: 0, heat: 0, overheat: 0, rockets: Math.max(c.rockets, 1) });
       c.turretYaw = c.aimYaw = c.h; c.turretPitch = c.aimPitch = 0;
       ev({ e: 'respawn', c: c.id });
       return;
@@ -839,7 +916,7 @@ function createRace(T, opts) {
     }
     Object.assign(c, {
       x: T.PX[i] + T.NX[i] * lane, z: T.PZ[i] + T.NZ[i] * lane, h: T.tangAng(i), idx: i, vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0,
-      armor: 100, alive: true, y: 0, vy: 0, air: false, shield: 0, shieldT: 0, invuln: 2, wreckT: 0, oil: 0, smokeT: 0, heat: 0, overheat: 0, rockets: Math.max(c.rockets, 1)
+      armor: c.maxArmor, alive: true, y: 0, vy: 0, air: false, shield: 0, shieldT: 0, invuln: 2, wreckT: 0, oil: 0, smokeT: 0, heat: 0, overheat: 0, rockets: Math.max(c.rockets, 1)
     });
     c.turretYaw = c.aimYaw = c.h; c.turretPitch = c.aimPitch = 0;
     ev({ e: 'respawn', c: c.id });
@@ -849,14 +926,14 @@ function createRace(T, opts) {
     b.hp -= amt; if (by) b.by = by;
     if (b.hp <= 0) { b.alive = false; b.t = 20; explode(b.x, b.z, b.by, 32, 6.5, null, b.y); }
   }
-  function explode(x, z, owner, dmg, radius, direct, y = 0) {
-    ev({ e: 'boom', x: r2(x), y: r2(y), z: r2(z), b: 1 });
+  function explode(x, z, owner, dmg, radius, direct, y = 0, small = false) {
+    ev({ e: 'boom', x: r2(x), y: r2(y), z: r2(z), b: small ? 0.55 : 1 });
     for (const b of R.barrels) if (b.alive && Math.hypot(b.x - x, b.z - z, b.y - y) < radius) hitBarrel(b, 25, owner);
     for (const c of R.cars) {
       const d = Math.hypot(c.x - x, c.z - z, (c.y || 0) - y);
       if (d > radius && c !== direct) continue;
       const k = c === direct ? 1 : 1 - d / radius * 0.7;
-      const nx = (c.x - x) / (d || 1), nz = (c.z - z) / (d || 1), push = 16 * k;
+      const nx = (c.x - x) / (d || 1), nz = (c.z - z) / (d || 1), push = 16 * k * (small ? 0.4 : 1) / (c.mass || 1);
       c.vx += nx * push; c.vz += nz * push;
       if (c.alive) c.h += rnd(-0.5, 0.5) * k;
       damage(c, dmg * k * (c === owner ? 0.5 : 1), owner);
@@ -881,7 +958,7 @@ function createRace(T, opts) {
       const hit = carContact(a, b);
       if (!hit) continue;
       const { nx, nz, pen } = hit;
-      const ma = a.alive ? 1 : 4, mb = b.alive ? 1 : 4, wa = mb / (ma + mb), wb = ma / (ma + mb);
+      const ma = (a.alive ? 1 : 4) * (a.mass || 1), mb = (b.alive ? 1 : 4) * (b.mass || 1), wa = mb / (ma + mb), wb = ma / (ma + mb);
       a.x -= nx * pen * wa; a.z -= nz * pen * wa; b.x += nx * pen * wb; b.z += nz * pen * wb;
       const rv = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
       if (rv >= 0) continue;
@@ -911,7 +988,7 @@ function createRace(T, opts) {
     a.laneT -= dt; a.padLock -= dt;
     if (a.padLock <= 0) {
       let want = null;
-      if (c.armor < 60) want = 'repair'; else if (c.rockets < 3) want = 'rocket'; else if (!c.rear) want = 'rear';
+      if (c.armor < 0.6 * c.maxArmor) want = 'repair'; else if (c.rockets < 3) want = 'rocket'; else if (!c.rear) want = 'rear';
       if (want) for (const p of R.pads) {
         if (!p.active || p.type !== want) continue;
         let ahead = p.gi - c.idx; if (ahead < 0) ahead += N;
@@ -941,7 +1018,7 @@ function createRace(T, opts) {
     }
     if (c.finished) mul *= 0.65;
     c.speedMul += (mul - c.speedMul) * Math.min(1, dt);
-    const targetSpd = C.BASE_MAX * c.speedMul * (1 - Math.min(0.4, bend * 0.35));
+    const targetSpd = C.BASE_MAX * (c.spd || 1) * c.speedMul * (1 - Math.min(0.4, bend * 0.35));
     ctl.steer = clamp(diff * 3, -1, 1);
     ctl.throttle = spd < targetSpd;
     ctl.brake = spd > targetSpd + 7;
@@ -986,10 +1063,13 @@ function createRace(T, opts) {
       const onTarget = Math.abs(wrapA(c.turretYaw - c.aimYaw)) < 0.18;
       a.trigger -= dt;
       if (a.trigger <= 0) a.trigger = c.heat > 0.7 ? rnd(0.8, 1.6) : rnd(-1.2, -0.4);
-      if (onTarget && a.trigger < 0 && c.heat < 0.82) fireMG(c, 0.6);
-      if (c.rockets > 0 && c.rocketCd <= 0 && d < 65) {
-        const ang = Math.abs(wrapA(Math.atan2(t.x - c.x, t.z - c.z) - c.h));
-        if (ang < 0.05 + D.acc * 0.04 && Math.random() < dt * 2.2 * D.aggr) fireRocket(c);
+      const reach = c.gun.speed * c.gun.life * 1.05;
+      if (onTarget && a.trigger < 0 && c.heat < 0.82 && d < reach) fireGun(c, 0.6);
+      if (c.rockets > 0 && c.rocketCd <= 0) {
+        const ang = Math.abs(wrapA(Math.atan2(t.x - c.x, t.z - c.z) - c.h)), k = c.rkt;
+        if (k === ROCKETS.homing) { if (d < 80 && ang < 0.6 && Math.random() < dt * 1.2 * D.aggr) fireRocket(c, t.id); }
+        else if (k === ROCKETS.salvo) { if (d < 50 && ang < 0.12 && Math.random() < dt * 2 * D.aggr) fireRocket(c); }
+        else if (d < 65 && ang < 0.05 + D.acc * 0.04 && Math.random() < dt * 2.2 * D.aggr) fireRocket(c);
       }
     } else { c.aimYaw = c.h; c.aimPitch = 0; }
     if (c.rear) {
@@ -1016,7 +1096,7 @@ function createRace(T, opts) {
       let bd = 70;
       for (const p of R.pads) {
         if (!p.active) continue;
-        const want = p.type === 'shield' ? c.shield <= 0 : p.type === (c.armor < 50 ? 'repair' : 'rocket') && (c.armor < 50 || c.rockets === 0);
+        const hurt = c.armor < 0.5 * c.maxArmor, want = p.type === 'shield' ? c.shield <= 0 : p.type === (hurt ? 'repair' : 'rocket') && (hurt || c.rockets === 0);
         if (!want || Math.abs((p.y || 0) - (c.y || 0)) > (p.type === 'shield' ? 2.1 : 1) || (p.y > 2.5 && R.vent)) continue;
         const d = Math.hypot(p.x - c.x, p.z - c.z) * (p.type === 'shield' ? 0.6 : 1); if (d < bd) { bd = d; pad = p; }
       }
@@ -1065,7 +1145,7 @@ function createRace(T, opts) {
     if (a.blind > 0) diff += Math.sin(R.time * 3.3 + a.seed) * 0.5;
     const dist = Math.hypot(dx - c.x, dz - c.z);
     c.speedMul = D.speed;
-    const targetSpd = C.BASE_MAX * D.speed * (a.route ? 0.85 : clamp(dist / 30, 0.35, 1)) * (Math.abs(diff) > 1.2 ? 0.5 : 1);
+    const targetSpd = C.BASE_MAX * (c.spd || 1) * D.speed * (a.route ? 0.85 : clamp(dist / 30, 0.35, 1)) * (Math.abs(diff) > 1.2 ? 0.5 : 1);
     ctl.steer = clamp(diff * 3, -1, 1);
     ctl.throttle = spd < targetSpd;
     ctl.brake = spd > targetSpd + 6;
@@ -1108,12 +1188,12 @@ function createRace(T, opts) {
         if (typeof inp.ay === 'number' && isFinite(inp.ay)) c.aimYaw = inp.ay;
         if (typeof inp.ap === 'number' && isFinite(inp.ap)) c.aimPitch = inp.ap;
         if (c.alive && R.raceTime >= ARM) {
-          if (inp.fi) fireMG(c, 1);
-          if (inp.rk) fireRocket(c);
+          if (inp.fi) fireGun(c, 1);
+          if (inp.rk) fireRocket(c, inp.lk);
           if (inp.re) useRear(c);
         }
       } else ctl = (ARENA_MODE ? aiArena : aiControl)(c, dt, armed && c.alive);
-      const rate = c.human ? 3.2 : 4;
+      const rate = c.gun.turn * (c.human ? 1 : 1.25);
       const relT = clamp(wrapA(c.aimYaw - c.h), -C.TURRET_ARC, C.TURRET_ARC);
       const relC = clamp(wrapA(c.turretYaw - c.h), -C.TURRET_ARC, C.TURRET_ARC);
       c.turretYaw = wrapA(c.h + relC + clamp(relT - relC, -rate * dt, rate * dt));
@@ -1158,12 +1238,25 @@ function createRace(T, opts) {
     // rockets
     for (let i = R.rockets.length - 1; i >= 0; i--) {
       const r = R.rockets[i];
+      if (r.target) {
+        const t = r.target;
+        if (!t.alive) r.target = null;
+        else {
+          const want = wrapA(Math.atan2(t.x - r.x, t.z - r.z) - r.h);
+          if (Math.abs(want) > 1.7) r.target = null;      // overshot: the lock is lost
+          else {
+            r.h = wrapA(r.h + clamp(want, -r.turn * dt, r.turn * dt));
+            const sp = Math.hypot(r.vx, r.vz); r.vx = Math.sin(r.h) * sp; r.vz = Math.cos(r.h) * sp;
+            r.y += clamp((t.y || 0) + 1.2 - r.y, -3 * dt, 3 * dt);
+          }
+        }
+      }
       r.x += r.vx * dt; r.z += r.vz * dt; r.life -= dt;
       let boom = r.life <= 0, direct = null;
       for (const c of R.cars) { if (c === r.owner) continue; if ((c.x - r.x) ** 2 + (c.z - r.z) ** 2 < 4.4 && Math.abs((c.y || 0) + 1 - r.y) < 1.8) { boom = true; direct = c; break; } }
       if (!boom) for (const br of R.barrels) if (br.alive && Math.abs(br.y + 0.7 - r.y) < 1.2 && (r.x - br.x) ** 2 + (r.z - br.z) ** 2 < 1.5) { boom = true; break; }
       if (!boom && T.blocked(r, r.y)) boom = true;
-      if (boom) { R.rockets.splice(i, 1); explode(r.x, r.z, r.owner, 36, 7, direct, r.y - 1); }
+      if (boom) { R.rockets.splice(i, 1); explode(r.x, r.z, r.owner, r.dmg, r.radius, direct, r.y - 1, r.mini); }
     }
     // mines
     for (let i = R.mines.length - 1; i >= 0; i--) {
@@ -1265,7 +1358,7 @@ function createRace(T, opts) {
         r2(c.steerSm), r2(c.nitro), c.rockets, c.rear ? REAR_CODE[c.rear] : 0, c.rearN, r2(c.heat), r2(c.overheat), Math.round(c.progress),
         r2(c.finishTime), c.kills, c.deaths, r2(c.respawnT), r2(c.smokeT), r2(c.invuln), r3(c.turretPitch), r2(Math.max(0, c.oil)), r2(c.oilSpin), r2(c.y || 0), r2(c.vy || 0), Math.ceil(c.shield || 0), r2(Math.max(0, c.shieldT || 0))
       ]),
-      r: R.rockets.map(r => [r.id, r2(r.x), r2(r.z), r3(r.h), r2(r.y)]),
+      r: R.rockets.map(r => [r.id, r2(r.x), r2(r.z), r3(r.h), r2(r.y), r.mini ? 1 : 0, r.target ? r.target.id : -1]),
       m: R.mines.map(m => [m.id, r2(m.x), r2(m.z), m.arm <= 0 ? 1 : 0, r2(m.y || 0)]),
       o: R.slicks.map(s => [s.id, r2(s.x), r2(s.z), r2(s.life), r2(s.y || 0)]),
       p: R.pads.map(p => p.active ? 1 : 0).join(''),
@@ -1275,9 +1368,9 @@ function createRace(T, opts) {
     R.events = [];
     return out;
   }
-  function info() { return R.cars.map(c => ({ id: c.id, name: c.name, color: c.color, human: c.human, pid: c.pid })); }
+  function info() { return R.cars.map(c => ({ id: c.id, name: c.name, color: c.color, human: c.human, pid: c.pid, loadout: c.loadout, maxArmor: c.maxArmor })); }
   function results() {
-    return ranking().map((c, i) => ({ id: c.id, name: c.name, color: c.color, human: c.human, pid: c.pid, rank: i + 1, finished: c.finished, time: r2(c.finishTime), kills: c.kills, deaths: c.deaths }));
+    return ranking().map((c, i) => ({ id: c.id, name: c.name, color: c.color, loadout: c.loadout, human: c.human, pid: c.pid, rank: i + 1, finished: c.finished, time: r2(c.finishTime), kills: c.kills, deaths: c.deaths }));
   }
   function releaseHuman(pid) { for (const c of R.cars) if (c.pid === pid) { c.human = false; c.speedMul = D.speed; } }
 
@@ -1287,7 +1380,7 @@ function createRace(T, opts) {
 function r2(v) { return Math.round(v * 100) / 100; }
 function r3(v) { return Math.round(v * 1000) / 1000; }
 
-return { C, DIFFS, COLORS, F, FL, REAR_KEYS, NOCTL, ARENA, buildTrack, buildArena, createRace, carPhysics, carContact, mulberry, clamp, wrapA };
+return { C, DIFFS, COLORS, PALETTE, CARS, GUNS, ROCKETS, cleanLoadout, F, FL, REAR_KEYS, NOCTL, ARENA, buildTrack, buildArena, createRace, carPhysics, carContact, mulberry, clamp, wrapA };
 });
 </script>
 <script>
@@ -1779,7 +1872,12 @@ const sfx = (() => {
       eng.f.frequency.setTargetAtTime(380 + Math.abs(speed) * 26 + (turbo ? 600 : 0), t, 0.08);
       eng.g.gain.setTargetAtTime(on ? 0.055 : 0, t, 0.15);
     },
-    mg(x, z, mine) { if (budget-- <= 0) return; const v = mine ? 1 : vol(x, z, 70) * 0.7; noise(0.07, 3200, 700, 0.16 * v, 'bandpass', 0.9); if (mine) tone(140, 0.05, 0.05, 'square', 60); },
+    mg(x, z, mine, kind) {
+      if (budget-- <= 0) return; const v = mine ? 1 : vol(x, z, 70) * 0.7;
+      if (kind === 'cannon') { noise(0.3, 900, 90, 0.38 * v, 'lowpass', 0.8); tone(95, 0.22, 0.12 * v, 'sine', 45); return; }
+      if (kind === 'shotgun') { noise(0.2, 2400, 300, 0.32 * v, 'lowpass', 0.7); return; }
+      noise(0.07, 3200, 700, 0.16 * v, 'bandpass', 0.9); if (mine) tone(140, 0.05, 0.05, 'square', 60);
+    },
     rocket(x, z) { noise(0.6, 500, 3000, 0.22 * vol(x, z, 90), 'bandpass', 1.5); },
     boom(x, z, big) { const v = vol(x, z, 140); noise(1.2 * big, 1100, 40, 0.75 * v, 'lowpass', 0.7); tone(70, 0.5, 0.25 * v, 'sine', 30); },
     thud(x, z, k) { noise(0.18, 700, 150, clamp(k, 0.05, 0.4) * vol(x, z, 50), 'lowpass'); },
@@ -1815,12 +1913,18 @@ function buildCar(def) {
   box(2.45, 0.45, 0.25, steel, 0, 0.82, -2.22);
   for (const s of [-1, 1]) {
     box(0.12, 0.5, 3.2, steel, s * 1.2, 0.88, 0);
-    const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.1, 10), steel); pod.rotation.x = PI / 2; pod.position.set(s * 0.82, 1.5, 1.05); body.add(pod);
+    if (def.rocket === 'salvo') { box(0.5, 0.42, 1.0, steel, s * 0.8, 1.52, 1.0); box(0.4, 0.3, 0.04, dark, s * 0.8, 1.52, 1.51); }
+    else {
+      const pod = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.1, 10), steel); pod.rotation.x = PI / 2; pod.position.set(s * 0.82, 1.5, 1.05); body.add(pod);
+      if (def.rocket === 'homing') box(0.36, 0.06, 0.36, dark, s * 0.82, 1.74, 0.85);
+    }
     box(0.42, 0.16, 0.06, head, s * 0.78, 0.98, 2.44);
     box(0.5, 0.14, 0.05, tail, s * 0.75, 0.98, -2.36);
   }
   for (const x of [-0.8, 0, 0.8]) { const sp = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.55, 6), steel); sp.rotation.x = PI / 2; sp.position.set(x, 0.8, 2.66); body.add(sp); }
   if (def.mine) box(0.5, 0.05, 4.32, M(0x15110a, { roughness: 0.5 }), 0, 1.17, 0);
+  if (def.car === 'scout') { box(2.0, 0.08, 0.5, paint, 0, 1.55, -2.0); for (const s of [-1, 1]) box(0.08, 0.38, 0.4, dark, s * 0.8, 1.35, -2.0); }
+  if (def.car === 'heavy') { for (const s of [-1, 1]) box(0.22, 0.7, 3.6, steel, s * 1.28, 0.95, 0); box(2.8, 0.7, 0.4, steel, 0, 0.82, 2.35); box(1.9, 0.12, 2.0, steel, 0, 1.82, -0.45); }
   const wheels = [];
   for (const [x, z, front] of [[-1.18, 1.4, 1], [1.18, 1.4, 1], [-1.18, -1.45, 0], [1.18, -1.45, 0]]) {
     const piv = new THREE.Group(); piv.position.set(x, 0.55, z); g.add(piv);
@@ -1830,8 +1934,10 @@ function buildCar(def) {
   const tur = new THREE.Group(); tur.position.set(0, 1.78, -0.45); g.add(tur);
   tur.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 0.32, 12), dark));
   const gun = new THREE.Group(); gun.position.y = C.GUN_Y - 1.78; tur.add(gun);
-  box(0.62, 0.36, 0.75, steel, 0, 0, 0.15, gun);
-  for (const s of [-1, 1]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.5, 6), dark); b.rotation.x = PI / 2; b.position.set(s * 0.13, 0, 0.95); gun.add(b); }
+  const barrel = (rad, len, x, z) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, len, 8), dark); b.rotation.x = PI / 2; b.position.set(x, 0, z); gun.add(b); };
+  if (def.gun === 'cannon') { box(0.72, 0.44, 0.95, steel, 0, 0, 0.1, gun); barrel(0.14, 2.4, 0, 1.6); box(0.34, 0.34, 0.32, steel, 0, 0, 2.8, gun); }
+  else if (def.gun === 'shotgun') { box(0.86, 0.42, 0.7, steel, 0, 0, 0.1, gun); for (const s of [-1, 1]) barrel(0.13, 0.95, s * 0.17, 0.85); }
+  else { box(0.62, 0.36, 0.75, steel, 0, 0, 0.15, gun); for (const s of [-1, 1]) barrel(0.07, 1.5, s * 0.13, 0.95); }
   const sh = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 6), shadowMat); sh.rotation.x = -PI / 2; sh.position.y = 0.04; g.add(sh);
   const bubble = new THREE.Mesh(bubbleGeo, new THREE.MeshBasicMaterial({ color: 0x4aa8ff, transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending }));
   bubble.scale.set(1.9, 1.35, 3.0); bubble.position.y = 1.1; bubble.visible = false; g.add(bubble);
@@ -1841,6 +1947,7 @@ function buildCar(def) {
   mats.length = 0;
   for (const m of [bodyMat, turMat, gunMat]) mats.push({ m, c: 0xffffff, e: 0 });
   mats.push({ m: tire, c: 0x0d0d0e, e: 0 });
+  if (def.car === 'scout') g.scale.set(0.93, 0.9, 0.95); else if (def.car === 'heavy') g.scale.set(1.08, 1.05, 1.07);
   scene.add(g);
   return { g, body, tur, gun, wheels, mats, bubble };
 }
@@ -1899,7 +2006,7 @@ function makeLabel(c) {
   c.label = { cvs, tex, sp, last: -1 };
 }
 function drawLabel(c, armor) {
-  const a = Math.max(0, Math.ceil(armor)); if (a === c.label.last) return; c.label.last = a;
+  const a = Math.max(0, Math.ceil(armor / (c.maxArmor || 100) * 100)); if (a === c.label.last) return; c.label.last = a;
   const g = c.label.cvs.getContext('2d');
   g.clearRect(0, 0, 256, 64);
   g.font = '700 26px "Saira Condensed", "Arial Narrow", sans-serif'; g.textAlign = 'center';
@@ -1966,8 +2073,85 @@ function onMsg(m) {
   else if (m.t === 'notice') { $('slotsNote').textContent = m.txt; }
 }
 function showOnly(id) {
-  for (const o of ['join', 'lobby', 'results', 'netErr', 'pause']) $(o).hidden = o !== id;
+  for (const o of ['join', 'lobby', 'results', 'netErr', 'pause', 'garage']) $(o).hidden = o !== id;
 }
+
+/* ---------- loadout & garage ---------- */
+let loadout = (() => { try { return S.cleanLoadout(JSON.parse(store.get('ironcircuit.loadout') || '{}')); } catch (e) { return S.cleanLoadout({}); } })();
+const LO_ROCKET_HUD = { std: 'ROQUETTES', homing: 'GUIDÉES', salvo: 'SALVES' };
+let garageOpen = false, garageBack = 'join', previewCar = null;
+const SHOW = new THREE.Vector3(0, 0, -320);
+function saveLoadout() { store.set('ironcircuit.loadout', JSON.stringify(loadout)); if (!SOLO && myId !== null) wsSend({ t: 'loadout', l: loadout }); }
+function loadoutLine(l) { return S.CARS[l.car].name + ' · ' + S.GUNS[l.gun].name + ' · ' + S.ROCKETS[l.rocket].name; }
+function statRows(el, rows) {
+  el.textContent = '';
+  for (const [label, frac, text] of rows) {
+    const d = document.createElement('div'); d.className = 'gstat';
+    const dt = document.createElement('dt'); dt.textContent = label;
+    const dd = document.createElement('dd'); const bar = document.createElement('i'); bar.style.width = Math.round(35 + 65 * clamp(frac, 0, 1)) + '%'; dd.appendChild(bar);
+    const b = document.createElement('b'); b.textContent = text;
+    d.append(dt, dd, b); el.appendChild(d);
+  }
+}
+const span = (vals, v) => { const lo = Math.min(...vals), hi = Math.max(...vals); return hi > lo ? (v - lo) / (hi - lo) : 1; };
+function renderGarage() {
+  const segFill = (id, defs, key) => {
+    const el = $(id); el.textContent = '';
+    for (const k of Object.keys(defs)) {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = defs[k].name; b.setAttribute('aria-pressed', String(loadout[key] === k));
+      b.addEventListener('click', () => { loadout[key] = k; saveLoadout(); renderGarage(); });
+      el.appendChild(b);
+    }
+  };
+  segFill('gCar', S.CARS, 'car'); segFill('gGun', S.GUNS, 'gun'); segFill('gRocket', S.ROCKETS, 'rocket');
+  const car = S.CARS[loadout.car], gun = S.GUNS[loadout.gun], rk = S.ROCKETS[loadout.rocket];
+  const cars = Object.values(S.CARS), guns = Object.values(S.GUNS);
+  const dps = g => g.dmg * g.pellets * g.rate, range = g => g.speed * g.life;
+  $('gCarDesc').textContent = car.desc; $('gGunDesc').textContent = gun.desc; $('gRocketDesc').textContent = rk.desc;
+  statRows($('gCarStats'), [
+    ['Vitesse', span(cars.map(c => c.spd), car.spd), Math.round(C.BASE_MAX * car.spd * C.KMH) + ' km/h'],
+    ['Blindage', span(cars.map(c => c.armor), car.armor), car.armor + ' PV'],
+    ['Maniabilité', span(cars.map(c => c.steer), car.steer), Math.round(car.steer * 100) + ' %'],
+    ['Masse', span(cars.map(c => c.mass), car.mass), Math.round(car.mass * 100) + ' %']
+  ]);
+  statRows($('gGunStats'), [
+    ['Dégâts/s', span(guns.map(dps), dps(gun)), Math.round(dps(gun))],
+    ['Portée', span(guns.map(range), range(gun)), Math.round(range(gun)) + ' m'],
+    ['Rotation', span(guns.map(g => g.turn), gun.turn), Math.round(gun.turn * 180 / PI) + '°/s']
+  ]);
+  const rks = Object.values(S.ROCKETS), tot = k => k.dmg * (k.count || 1);
+  statRows($('gRocketStats'), [
+    ['Dégâts', span(rks.map(tot), tot(rk)), rk.count ? rk.count + ' × ' + rk.dmg : String(rk.dmg)],
+    ['Zone', span(rks.map(k => k.radius), rk.radius), rk.radius + ' m'],
+    ['Vitesse', span(rks.map(k => k.speed), rk.speed), Math.round(rk.speed * C.KMH) + ' km/h']
+  ]);
+  const sw = $('gColor'); sw.textContent = '';
+  for (const col of S.PALETTE) {
+    const b = document.createElement('button'); b.type = 'button'; b.style.background = hex(col); b.setAttribute('aria-label', 'Couleur ' + hex(col));
+    b.setAttribute('aria-pressed', String(loadout.color === col));
+    b.addEventListener('click', () => { loadout.color = col; saveLoadout(); renderGarage(); });
+    sw.appendChild(b);
+  }
+  if (garageOpen) buildPreview();
+}
+function buildPreview() {
+  const rot = previewCar ? previewCar.g.rotation.y : 0.6;
+  if (previewCar) scene.remove(previewCar.g);
+  previewCar = buildCar({ color: loadout.color, car: loadout.car, gun: loadout.gun, rocket: loadout.rocket });
+  previewCar.g.position.copy(SHOW); previewCar.g.rotation.y = rot;
+}
+function openGarage() {
+  garageBack = mode === 'lobby' ? 'lobby' : 'join';
+  garageOpen = true; renderGarage(); showOnly('garage');
+}
+function closeGarage() {
+  garageOpen = false; camera.clearViewOffset();
+  if (previewCar) { scene.remove(previewCar.g); previewCar = null; }
+  if (mode === 'join' || mode === 'lobby') showOnly(garageBack);
+}
+$('garageBtnSolo').addEventListener('click', openGarage);
+$('garageBtnLobby').addEventListener('click', openGarage);
+$('garageDone').addEventListener('click', closeGarage);
 
 /* ---------- lobby ---------- */
 const segBtns = document.querySelectorAll('#lobbySeg button');
@@ -1989,7 +2173,7 @@ $('joinForm').addEventListener('submit', e => {
   if (!name) { $('nameInput').focus(); return; }
   store.set('ironcircuit.name', name);
   sfx.init();
-  wsSend({ t: 'hello', name });
+  wsSend({ t: 'hello', name, loadout });
 });
 function onLobby(m) {
   lastLobby = m; hostId = m.host;
@@ -2000,10 +2184,11 @@ function onLobby(m) {
   m.players.forEach((p, i) => {
     const racer = !p.spec && nRacers < C.MAX_CARS; if (racer) nRacers++;
     const li = document.createElement('li');
-    const dot = document.createElement('i'); dot.style.background = hex(S.COLORS[p.color]);
+    const dot = document.createElement('i'); dot.style.background = hex(p.color);
     const nm = document.createElement('span'); nm.textContent = p.name;
     const tag = document.createElement('small');
     tag.textContent = [p.id === m.host ? 'HÔTE' : '', p.id === myId ? 'TOI' : '', !racer ? 'SPECTATEUR' : ''].filter(Boolean).join(' · ');
+    if (p.loadout) { const lo = document.createElement('span'); lo.className = 'lo'; lo.textContent = loadoutLine(p.loadout); tag.appendChild(lo); }
     li.append(dot, nm, tag); ul.appendChild(li);
   });
   const ai = m.ai === 'none' ? 0 : Math.max(0, C.MAX_CARS - nRacers);
@@ -2029,7 +2214,7 @@ function onLobby(m) {
   $('startBtn').hidden = !isHost; $('waitNote').hidden = isHost;
   $('backBtn').hidden = !isHost; $('resWait').hidden = isHost;
   if (myId === null) return;
-  if (m.phase === 'lobby') { setMap(m.mode); endRaceView(); mode = 'lobby'; showOnly('lobby'); }
+  if (m.phase === 'lobby') { setMap(m.mode); endRaceView(); mode = 'lobby'; if (!garageOpen) showOnly('lobby'); else garageBack = 'lobby'; }
   else if (m.phase === 'race' && mode === 'join') { showOnly(null); }
   else if (m.phase === 'results' && mode === 'join') { mode = 'lobby'; showOnly('lobby'); }
 }
@@ -2037,18 +2222,21 @@ function onLobby(m) {
 /* ---------- race ---------- */
 const standRows = [];
 function onStart(m) {
+  if (garageOpen) closeGarage();
   setMap(m.mode);
   clearWorld();
   for (const c of cars) scene.remove(c.g);
   spectator = !!m.spectator;
   cars = m.cars.map(ci => {
     const mine = !spectator && ci.pid === myId;
-    const c = Object.assign(buildCar({ color: ci.color, mine }), ci, { mine, st: null, smokeEmit: 0, lastLap: 0 });
+    const lo = ci.loadout || S.cleanLoadout({});
+    const c = Object.assign(buildCar({ color: ci.color, mine, car: lo.car, gun: lo.gun, rocket: lo.rocket }), ci, { mine, st: null, smokeEmit: 0, lastLap: 0, loadout: lo, maxArmor: ci.maxArmor || 100 });
     if (!mine) makeLabel(c);
     return c;
   });
   myCar = cars.find(c => c.mine) || null;
   $('posBox').querySelector('small').textContent = '/' + cars.length;
+  if (myCar) $('slotRocket').querySelector('.lbl').textContent = LO_ROCKET_HUD[myCar.loadout.rocket];
   curSnap = null; snaps = []; clockOff = null; pending.length = 0; pc.valid = false; stepAcc = 0;
   H.standings.textContent = ''; standRows.length = 0;
   for (const c of cars) {
@@ -2089,7 +2277,7 @@ function onSnap(m) {
   for (const r of m.r) {
     seenR.add(r[0]);
     let o = rocketObjs.get(r[0]);
-    if (!o) { const mesh = new THREE.Mesh(rocketGeo, rocketMat); mesh.rotation.order = 'YXZ'; mesh.rotation.set(PI / 2, r[3], 0); mesh.position.set(r[1], r[4] || 1.5, r[2]); scene.add(mesh); o = { m: mesh }; rocketObjs.set(r[0], o); }
+    if (!o) { const mesh = new THREE.Mesh(rocketGeo, rocketMat); mesh.rotation.order = 'YXZ'; mesh.rotation.set(PI / 2, r[3], 0); mesh.position.set(r[1], r[4] || 1.5, r[2]); if (r[5]) mesh.scale.setScalar(0.6); scene.add(mesh); o = { m: mesh }; rocketObjs.set(r[0], o); }
   }
   for (const [id, o] of rocketObjs) if (!seenR.has(id)) { scene.remove(o.m); rocketObjs.delete(id); }
   const seenM = new Set();
@@ -2124,9 +2312,14 @@ function handleEvent(e) {
     case 'armed': if (myCar) feed('Armes activées', 'good'); break;
     case 'mg': {
       const t = tracers[tracerIdx]; tracerIdx = (tracerIdx + 1) % tracers.length;
-      Object.assign(t, { on: true, id: e.id, x: e.x, y: e.y, z: e.z, vx: e.vx, vy: e.vy, vz: e.vz, life: 0.45 });
-      fx.spawn(e.x, e.y, e.z, 0, 0, 0, 0.05, 1.1, 0.6, 0xffc060, 1);
-      sfx.mg(e.x, e.z, mine(e.c));
+      const gk = e.g || 'mg', ti = tracers.indexOf(t);
+      Object.assign(t, { on: true, id: e.id, x: e.x, y: e.y, z: e.z, vx: e.vx, vy: e.vy, vz: e.vz, life: e.l || 0.45, len: gk === 'cannon' ? 5 : gk === 'shotgun' ? 1.2 : 2.4 });
+      trCol.set(gk === 'cannon' ? [1, 1, 0.85, 1, 0.6, 0.2] : gk === 'shotgun' ? [1, 0.75, 0.4, 0.8, 0.35, 0.15] : [1, 0.9, 0.6, 0.9, 0.45, 0.25], ti * 6); trGeo.attributes.color.needsUpdate = true;
+      if (!e.k) {
+        fx.spawn(e.x, e.y, e.z, 0, 0, 0, gk === 'mg' ? 0.05 : 0.09, gk === 'mg' ? 1.1 : 2.2, 0.6, 0xffc060, 1);
+        sfx.mg(e.x, e.z, mine(e.c), gk);
+        if (gk === 'cannon' && mine(e.c)) addShake(e.x, e.z, 0.18, 10);
+      }
       if (mine(e.c)) perf.shots++;
       break;
     }
@@ -2173,6 +2366,7 @@ function handleEvent(e) {
       break;
     }
     case 'left': feed('Plus que ' + e.s + ' s', 'bad'); break;
+    case 'locked': if (mine(e.t)) { feed('Roquette guidée sur toi : esquive !', 'bad'); sfx.beep(true); } break;
     case 'vent':
       if (e.p === 1 && myCar && myCar.st && (myCar.st.y || 0) > 2.5) { feed('Les grilles chauffent : quitte la plateforme !', 'bad'); sfx.overheat(); }
       break;
@@ -2257,10 +2451,42 @@ canvas.addEventListener('mousedown', e => {
   sfx.init();
   if (!document.pointerLockElement) lockPointer();
   if (e.button === 0) { mouseDown = true; perf.clicks++; }
-  if (e.button === 2) rocketCount++;
+  if (e.button === 2) {
+    if (myCar && myCar.loadout.rocket === 'homing') { lockHold = true; lockT = 0; lockId = -1; }
+    else { lockFire = -1; rocketCount++; }
+  }
   e.preventDefault();
 });
-addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; });
+addEventListener('mouseup', e => {
+  if (e.button === 0) mouseDown = false;
+  if (e.button === 2 && lockHold) {
+    lockHold = false;
+    lockFire = lockT >= S.ROCKETS.homing.lock && lockId >= 0 ? lockId : -1;
+    rocketCount++; lockId = -1; lockT = 0;
+  }
+});
+// Guided rockets: hold right click on a car near the crosshair; it locks after 0.6 s.
+let lockHold = false, lockT = 0, lockId = -1, lockFire = -1;
+const lockEl = $('lockMark'), lockV = new THREE.Vector3();
+function updateLock(dt) {
+  if (!lockHold || !myCar || !myCar.st || !myCar.st.alive || mode !== 'race') { lockEl.hidden = true; if (!myCar || mode !== 'race') lockHold = false; return; }
+  const me = myCar.st, cx = innerWidth / 2, cy = innerHeight / 2;
+  let best = null, bd = innerHeight * 0.2, bx = 0, by = 0;
+  for (const c of cars) {
+    if (c === myCar || !c.st || !c.st.alive) continue;
+    if (Math.hypot(c.st.x - me.x, c.st.z - me.z) > S.ROCKETS.homing.range) continue;
+    lockV.set(c.st.x, (c.st.y || 0) + 1.1, c.st.z).project(camera);
+    if (lockV.z > 1) continue;
+    const sx = (lockV.x + 1) / 2 * innerWidth, sy = (1 - lockV.y) / 2 * innerHeight, d = Math.hypot(sx - cx, sy - cy);
+    if (d < bd) { bd = d; best = c; bx = sx; by = sy; }
+  }
+  if (!best) { lockId = -1; lockT = 0; lockEl.hidden = true; return; }
+  if (best.id === lockId) lockT += dt; else { lockId = best.id; lockT = 0; }
+  const done = lockT >= S.ROCKETS.homing.lock, k = done ? 1 : 1.7 - 0.7 * lockT / S.ROCKETS.homing.lock;
+  lockEl.hidden = false; lockEl.classList.toggle('locked', done);
+  lockEl.style.transform = 'translate(' + bx.toFixed(1) + 'px,' + by.toFixed(1) + 'px) scale(' + k.toFixed(2) + ')';
+  lockEl.querySelector('span').textContent = done ? 'VERROUILLÉ · RELÂCHE' : 'VERROUILLAGE…';
+}
 addEventListener('contextmenu', e => { if (e.target === canvas || driving()) e.preventDefault(); });
 const k = c => keys.has(c);
 function readInput() {
@@ -2272,7 +2498,7 @@ function readInput() {
     dr: k('Space') ? 1 : 0,
     tu: k('ShiftLeft') || k('ShiftRight') ? 1 : 0,
     fi: mouseDown ? 1 : 0,
-    ay: r3(aimYaw), ap: r3(aimPitch)
+    ay: r3(aimYaw), ap: r3(aimPitch), lk: lockFire
   };
 }
 document.addEventListener('pointerlockchange', () => {
@@ -2347,6 +2573,7 @@ function reconcile(m) {
   Object.assign(pc, {
     x: row[F.x], z: row[F.z], h, vF, vL, vx: Math.sin(h) * vF + Math.cos(h) * vL, vz: Math.cos(h) * vF - Math.sin(h) * vL,
     steerSm: row[F.steer], nitro: row[F.nitro], oil: row[F.oil], oilSpin: row[F.oilSpin], speedMul: 1, alive: true,
+    spd: S.CARS[myCar.loadout.car].spd, steerK: S.CARS[myCar.loadout.car].steer, accK: S.CARS[myCar.loadout.car].acc,
     drifting: !!(fl & FL.drifting), turboOn: !!(fl & FL.turbo), progress: 0,
     y: row[F.y] || 0, vy: row[F.vy] || 0, air: !!(fl & FL.air)
   });
@@ -2425,6 +2652,7 @@ function interp(now) {
     const rb = B.r.find(r => r[0] === id) || curSnap.r.find(r => r[0] === id);
     if (!rb) continue;
     const ra = A.r.find(r => r[0] === id) || rb;
+    o.m.rotation.y = ra[3] + wrapA(rb[3] - ra[3]) * a;
     o.m.position.set(ra[1] + (rb[1] - ra[1]) * a, (ra[4] || 1.5) + ((rb[4] || 1.5) - (ra[4] || 1.5)) * a, ra[2] + (rb[2] - ra[2]) * a);
   }
 }
@@ -2470,7 +2698,7 @@ function updateVisuals(dt, time) {
     const t = tracers[k], o = k * 6;
     if (t.on) { t.x += t.vx * dt; t.y += t.vy * dt; t.z += t.vz * dt; t.life -= dt; if (t.life <= 0) t.on = false; }
     if (!t.on) { trPos.fill(0, o, o + 6); continue; }
-    const inv = 2.4 / (Math.hypot(t.vx, t.vy, t.vz) || 1);
+    const inv = (t.len || 2.4) / (Math.hypot(t.vx, t.vy, t.vz) || 1);
     trPos[o] = t.x; trPos[o + 1] = t.y; trPos[o + 2] = t.z;
     trPos[o + 3] = t.x - t.vx * inv; trPos[o + 4] = t.y - t.vy * inv; trPos[o + 5] = t.z - t.vz * inv;
   }
@@ -2583,7 +2811,7 @@ function updateHUD(dt) {
     rank.forEach((c, i) => {
       const r = standRows.find(s => s.c === c);
       r.rk.textContent = i + 1;
-      r.tag.textContent = !c.st.alive ? 'KO' : MODE === 'arena' ? c.st.kills + ' pts' : c.st.finished ? 'ARRIVÉ' : Math.max(0, Math.ceil(c.st.armor)) + '%';
+      r.tag.textContent = !c.st.alive ? 'KO' : MODE === 'arena' ? c.st.kills + ' pts' : c.st.finished ? 'ARRIVÉ' : Math.max(0, Math.ceil(c.st.armor / (c.maxArmor || 100) * 100)) + '%';
       r.li.classList.toggle('out', !c.st.alive);
       H.standings.appendChild(r.li);
     });
@@ -2599,10 +2827,10 @@ function updateHUD(dt) {
   $('hLapLbl').textContent = arena ? 'SCORE' : 'TOUR';
   H.lap.textContent = arena ? p.kills + '/' + C.ARENA_KILLS : Math.min(LAPS, Math.max(1, Math.floor(p.progress / N) + 1)) + '/' + LAPS;
   H.time.textContent = fmtTime(arena ? left : p.finished ? p.finishTime : rt);
-  const a = Math.max(0, Math.ceil(p.armor));
-  H.armor.style.width = a + '%'; H.armor.classList.toggle('low', a <= 30); H.armorN.textContent = a + (p.shield > 0 ? ' +' + p.shield + ' · ' + Math.ceil(p.shieldT) + ' s' : '');
+  const a = Math.max(0, Math.ceil(p.armor)), mx = myCar.maxArmor || 100, pct = a / mx * 100;
+  H.armor.style.width = pct + '%'; H.armor.classList.toggle('low', pct <= 30); H.armorN.textContent = a + (p.shield > 0 ? ' +' + p.shield + ' · ' + Math.ceil(p.shieldT) + ' s' : '');
   H.armorN.classList.toggle('shb', p.shield > 0);
-  $('hShield').style.width = (p.shield || 0) + '%';
+  $('hShield').style.width = Math.min(100, (p.shield || 0) / mx * 100) + '%';
   $('hShieldT').style.width = (p.shield > 0 ? p.shieldT / 15 * 100 : 0) + '%';
   H.nitro.style.width = (p.nitro * 100).toFixed(0) + '%'; H.nitroN.textContent = (p.nitro * 100).toFixed(0);
   H.speed.textContent = Math.round(Math.abs(p.vF) * C.KMH);
@@ -2697,6 +2925,17 @@ function updateCamera(dt, time) {
     listener.x = p.x; listener.z = p.z;
     return;
   }
+  // garage: slow turntable around the car being configured, shifted to the right of the panel
+  if (garageOpen) {
+    if (previewCar) previewCar.g.rotation.y += dt * 0.5;
+    const a = 0.9;
+    camPos.set(SHOW.x + Math.sin(a) * 8.5, 3.2, SHOW.z + Math.cos(a) * 8.5);
+    camera.position.copy(camPos); camLook.set(SHOW.x, 1.0, SHOW.z); camera.lookAt(camLook);
+    camera.fov = 45; camera.updateProjectionMatrix();
+    if (innerWidth > 800) camera.setViewOffset(innerWidth, innerHeight, -innerWidth * 0.2, 0, innerWidth, innerHeight); else camera.clearViewOffset();
+    sodiumLamp.position.set(SHOW.x + 3, 9, SHOW.z + 3);
+    return;
+  }
   // orbit: race leader after the race, start line in menus
   const lead = (mode === 'race' || mode === 'results') && cars.length && cars[0].st ? ranking()[0].st : null;
   const preview = !lead && MODE === 'arena';   // menus: slow tour of the selected map
@@ -2729,7 +2968,7 @@ function renderBest() {
 }
 function soloStart() {
   sfx.init();
-  local.race = S.createRace(soloMode === 'arena' ? AR : T, { humans: [{ id: 1, name: 'TOI', color: 0 }], diff: soloDiff, ai: soloAi ? C.MAX_CARS : 0 });
+  local.race = S.createRace(soloMode === 'arena' ? AR : T, { humans: [{ id: 1, name: 'TOI', loadout }], diff: soloDiff, ai: soloAi ? C.MAX_CARS : 0 });
   local.acc = 0; local.paused = false; local.ending = false; local.rk = rocketCount; local.re = rearCount;
   myId = 1;
   onStart({ cars: local.race.info(), spectator: false, mode: soloMode });
@@ -2743,7 +2982,7 @@ function soloTick(dt) {
   while (L.acc >= 1 / 60) {
     const inp = {};
     if (myCar) {
-      inp[myCar.id] = Object.assign(readInput(), { rk: rocketCount > L.rk, re: rearCount > L.re });
+      inp[myCar.id] = Object.assign(readInput(), { rk: rocketCount > L.rk, re: rearCount > L.re, lk: lockFire });
       L.rk = rocketCount; L.re = rearCount;
     }
     L.race.step(1 / 60, inp);
@@ -2909,7 +3148,7 @@ function frame(now) {
   updateVisuals(dt, time);
   updateCamera(dt, time);
   if (mode === 'race') {
-    updateAim(); updateGunMark(); updateHUD(dt);
+    updateAim(); updateGunMark(); updateHUD(dt); updateLock(dt);
     const p = myCar && myCar.st;
     sfx.engine(p ? p.vF : 0, p && p.turbo, !!(p && p.alive && !p.finished));
   }
