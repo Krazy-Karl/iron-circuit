@@ -35,7 +35,7 @@ const PAD_GROUPS = [160, 340, 520, 700, 880, 1060], PAD_LAT = [-6, 0, 6];
 const PAD_ORDER = [['rocket', 'rear', 'repair'], ['rear', 'repair', 'rocket'], ['repair', 'rocket', 'rear']];
 const REAR_KEYS = ['oil', 'mines', 'smoke'], REAR_N = { oil: 2, mines: 3, smoke: 1 }, REAR_CODE = { oil: 1, mines: 2, smoke: 3 };
 // snapshot layout of one car
-const F = { x: 0, z: 1, h: 2, vF: 3, vL: 4, tur: 5, armor: 6, flags: 7, steer: 8, nitro: 9, rockets: 10, rear: 11, rearN: 12, heat: 13, overheat: 14, progress: 15, finishTime: 16, kills: 17, deaths: 18, respawnT: 19, smokeT: 20, invuln: 21, tp: 22, oil: 23, oilSpin: 24, y: 25, vy: 26 };
+const F = { x: 0, z: 1, h: 2, vF: 3, vL: 4, tur: 5, armor: 6, flags: 7, steer: 8, nitro: 9, rockets: 10, rear: 11, rearN: 12, heat: 13, overheat: 14, progress: 15, finishTime: 16, kills: 17, deaths: 18, respawnT: 19, smokeT: 20, invuln: 21, tp: 22, oil: 23, oilSpin: 24, y: 25, vy: 26, shield: 27 };
 const FL = { alive: 1, finished: 2, turbo: 4, drifting: 8, oil: 16, air: 32 };
 
 function buildTrack(THREE) {
@@ -78,32 +78,60 @@ function buildTrack(THREE) {
 /* ---------- Arena: a yard with a deck on ramps, a tunnel under it, jump ramps, cover and barrels ----------
    Everything solid is a box footprint with a bottom and a top; the top can slope (ramps).
    A car can drive onto any top that is at most 0.9 above it; anything higher is a wall. */
+const P = 3.2;   // platform height
 const ARENA = {
-  W: 75, D: 55, WALL_H: 3, DECK: 4,
+  W: 95, D: 70, WALL_H: 3,
   solids: [
-    // deck: two solid supports and a slab over the tunnel (tunnel runs along x, z in [-5, 5])
-    { x0: -22, x1: 22, z0: -12, z1: -5, b: 0, h0: 4, h1: 4 },
-    { x0: -22, x1: 22, z0: 5, z1: 12, b: 0, h0: 4, h1: 4 },
-    { x0: -22, x1: 22, z0: -5, z1: 5, b: 3.4, h0: 4, h1: 4 },
-    // ramps up to the deck (north and south)
-    { x0: -7, x1: 7, z0: 12, z1: 28, b: 0, ax: 'z', a0: 12, a1: 28, h0: 4, h1: 0 },
-    { x0: -7, x1: 7, z0: -28, z1: -12, b: 0, ax: 'z', a0: -12, a1: -28, h0: 4, h1: 0 },
+    // two corner platforms, each with two ramps on different sides
+    { x0: 30, x1: 54, z0: 22, z1: 42, b: 0, h0: P, h1: P },
+    { x0: 14, x1: 30, z0: 28, z1: 36, b: 0, ax: 'x', a0: 30, a1: 14, h0: P, h1: 0 },
+    { x0: 38, x1: 46, z0: 8, z1: 22, b: 0, ax: 'z', a0: 22, a1: 8, h0: P, h1: 0 },
+    { x0: -54, x1: -30, z0: -42, z1: -22, b: 0, h0: P, h1: P },
+    { x0: -30, x1: -14, z0: -36, z1: -28, b: 0, ax: 'x', a0: -30, a1: -14, h0: P, h1: 0 },
+    { x0: -46, x1: -38, z0: -22, z1: -8, b: 0, ax: 'z', a0: -22, a1: -8, h0: P, h1: 0 },
+    // central hill, reachable from all four sides (the shield waits on top)
+    { x0: -6, x1: 6, z0: -6, z1: 6, b: 0, h0: 2, h1: 2 },
+    { x0: 6, x1: 16, z0: -6, z1: 6, b: 0, ax: 'x', a0: 6, a1: 16, h0: 2, h1: 0 },
+    { x0: -16, x1: -6, z0: -6, z1: 6, b: 0, ax: 'x', a0: -6, a1: -16, h0: 2, h1: 0 },
+    { x0: -6, x1: 6, z0: 6, z1: 16, b: 0, ax: 'z', a0: 6, a1: 16, h0: 2, h1: 0 },
+    { x0: -6, x1: 6, z0: -16, z1: -6, b: 0, ax: 'z', a0: -6, a1: -16, h0: 2, h1: 0 },
+    // speed bumps (they throw you when taken fast)
+    { x0: 62, x1: 68, z0: -6, z1: 6, b: 0, ax: 'x', a0: 62, a1: 68, h0: 0, h1: 1.2 }, { x0: 68, x1: 74, z0: -6, z1: 6, b: 0, ax: 'x', a0: 68, a1: 74, h0: 1.2, h1: 0 },
+    { x0: -68, x1: -62, z0: -6, z1: 6, b: 0, ax: 'x', a0: -62, a1: -68, h0: 0, h1: 1.2 }, { x0: -74, x1: -68, z0: -6, z1: 6, b: 0, ax: 'x', a0: -68, a1: -74, h0: 1.2, h1: 0 },
+    { x0: -6, x1: 6, z0: 44, z1: 50, b: 0, ax: 'z', a0: 44, a1: 50, h0: 0, h1: 1.2 }, { x0: -6, x1: 6, z0: 50, z1: 56, b: 0, ax: 'z', a0: 50, a1: 56, h0: 1.2, h1: 0 },
+    { x0: -6, x1: 6, z0: -50, z1: -44, b: 0, ax: 'z', a0: -44, a1: -50, h0: 0, h1: 1.2 }, { x0: -6, x1: 6, z0: -56, z1: -50, b: 0, ax: 'z', a0: -50, a1: -56, h0: 1.2, h1: 0 },
     // jump ramps
-    { x0: -52, x1: -44, z0: -8, z1: 4, b: 0, ax: 'z', a0: -8, a1: 4, h0: 0, h1: 1.8 },
-    { x0: 44, x1: 52, z0: -4, z1: 8, b: 0, ax: 'z', a0: 8, a1: -4, h0: 0, h1: 1.8 },
-    // cover blocks
-    { x0: -46, x1: -30, z0: -32, z1: -28, b: 0, h0: 2.6, h1: 2.6 }, { x0: 30, x1: 46, z0: 28, z1: 32, b: 0, h0: 2.6, h1: 2.6 },
-    { x0: -40, x1: -36, z0: 26, z1: 40, b: 0, h0: 2.6, h1: 2.6 }, { x0: 36, x1: 40, z0: -40, z1: -26, b: 0, h0: 2.6, h1: 2.6 },
-    { x0: -65, x1: -59, z0: 14, z1: 30, b: 0, h0: 2.6, h1: 2.6 }, { x0: 59, x1: 65, z0: -30, z1: -14, b: 0, h0: 2.6, h1: 2.6 },
-    { x0: -10, x1: 10, z0: -46, z1: -42, b: 0, h0: 2.6, h1: 2.6 }, { x0: -10, x1: 10, z0: 42, z1: 46, b: 0, h0: 2.6, h1: 2.6 }
+    { x0: -82, x1: -74, z0: 24, z1: 36, b: 0, ax: 'z', a0: 24, a1: 36, h0: 0, h1: 1.8 },
+    { x0: 74, x1: 82, z0: -36, z1: -24, b: 0, ax: 'z', a0: -24, a1: -36, h0: 0, h1: 1.8 },
+    // low cover, mostly in the blind zone at the foot of the platforms
+    { x0: 14, x1: 26, z0: 50.5, z1: 53.5, b: 0, h0: 2.4, h1: 2.4 }, { x0: -26, x1: -14, z0: -53.5, z1: -50.5, b: 0, h0: 2.4, h1: 2.4 },
+    { x0: 60.5, x1: 63.5, z0: -28, z1: -16, b: 0, h0: 2.4, h1: 2.4 }, { x0: -63.5, x1: -60.5, z0: 16, z1: 28, b: 0, h0: 2.4, h1: 2.4 },
+    { x0: -32, x1: -24, z0: 20.5, z1: 23.5, b: 0, h0: 2.4, h1: 2.4 }, { x0: 24, x1: 32, z0: -23.5, z1: -20.5, b: 0, h0: 2.4, h1: 2.4 },
+    { x0: 57, x1: 59.5, z0: 27, z1: 37, b: 0, h0: 2.4, h1: 2.4 }, { x0: -59.5, x1: -57, z0: -37, z1: -27, b: 0, h0: 2.4, h1: 2.4 },
+    { x0: -77, x1: -67, z0: -53.5, z1: -50.5, b: 0, h0: 2.4, h1: 2.4 }, { x0: 67, x1: 77, z0: 50.5, z1: 53.5, b: 0, h0: 2.4, h1: 2.4 },
+    { x0: -5, x1: 5, z0: 29, z1: 31.5, b: 0, h0: 2.4, h1: 2.4 }, { x0: -5, x1: 5, z0: -31.5, z1: -29, b: 0, h0: 2.4, h1: 2.4 }
   ],
-  barrels: [[6, 0, 0], [-26, 16, 0], [26, -16, 0], [-44, -24, 0], [44, 24, 0], [-58, -40, 0], [58, 40, 0], [-14, -36, 0], [14, 36, 0], [12, 8, 4], [-12, -8, 4]],
+  // burning vents on the platform tops: 2 s warning then 3 s of fire, every 20 s
+  vents: [{ x0: 30, x1: 54, z0: 22, z1: 42, y: P }, { x0: -54, x1: -30, z0: -42, z1: -22, y: P }],
+  barrels: [[10, -10, 0], [-10, 10, 0], [18, 22, 0], [-18, -22, 0], [57, 16, 0], [-57, -16, 0], [35, -46, 0], [-35, 46, 0], [84, 10, 0], [-84, -10, 0],
+    [42, 32, P], [-42, -32, P], [88, -62, 0], [-88, 62, 0]],
   pads: [
-    { type: 'repair', x: -30, z: 0, y: 0 }, { type: 'repair', x: 30, z: 0, y: 0 },
-    { type: 'rocket', x: 0, z: -8.5, y: 4 }, { type: 'rocket', x: 0, z: 8.5, y: 4 }, { type: 'rocket', x: -60, z: -40, y: 0 }, { type: 'rocket', x: 60, z: 40, y: 0 },
-    { type: 'rear', x: -46, z: 34, y: 0 }, { type: 'rear', x: 46, z: -34, y: 0 }, { type: 'rear', x: -10, z: 0, y: 0 }
+    { type: 'shield', x: 0, z: 0, y: 2 },
+    { type: 'rocket', x: 48, z: 38, y: P }, { type: 'rocket', x: -48, z: -38, y: P }, { type: 'rocket', x: 84, z: 0, y: 0 }, { type: 'rocket', x: -84, z: 0, y: 0 },
+    { type: 'repair', x: -40, z: 40, y: 0 }, { type: 'repair', x: 40, z: -40, y: 0 },
+    { type: 'rear', x: 0, z: 62, y: 0 }, { type: 'rear', x: 0, z: -62, y: 0 }, { type: 'rear', x: -45, z: 0, y: 0 }, { type: 'rear', x: 45, z: 0, y: 0 }
   ],
-  spawns: [[-66, -46], [66, 46], [-66, 46], [66, -46], [-24, -50], [24, 50], [24, -50], [-24, 50]]
+  spawns: [[-85, -60], [85, 60], [-85, 60], [85, -60], [-30, -62], [30, 62], [30, -62], [-30, 62]],
+  // routes the AI can follow (deck: over a platform, avoided while the vents burn)
+  routes: [
+    { deck: true, pts: [[6, 32], [22, 32], [42, 32], [42, 20], [42, 2]] }, { deck: true, pts: [[42, 2], [42, 20], [42, 32], [22, 32], [6, 32]] },
+    { deck: true, pts: [[-6, -32], [-22, -32], [-42, -32], [-42, -20], [-42, -2]] }, { deck: true, pts: [[-42, -2], [-42, -20], [-42, -32], [-22, -32], [-6, -32]] },
+    { pts: [[26, 0], [10, 0], [0, 0], [-10, 0], [-26, 0]] }, { pts: [[-26, 0], [-10, 0], [0, 0], [10, 0], [26, 0]] },
+    { pts: [[0, 24], [0, 10], [0, 0], [0, -10], [0, -24]] }, { pts: [[0, -24], [0, -10], [0, 0], [0, 10], [0, 24]] },
+    { pts: [[50, 0], [82, 0]] }, { pts: [[-50, 0], [-82, 0]] }, { pts: [[0, 38], [0, 64]] }, { pts: [[0, -38], [0, -64]] },
+    { pts: [[-78, 12], [-78, 40], [-78, 56]] }, { pts: [[78, -12], [78, -40], [78, -56]] }
+  ],
+  exits: [[[6, 32], [42, 2]], [[-6, -32], [-42, -2]]]
 };
 function solidTop(s, x, z) {
   if (!s.ax) return s.h1;
@@ -111,7 +139,7 @@ function solidTop(s, x, z) {
   return s.h0 + (s.h1 - s.h0) * t;
 }
 function buildArena() {
-  const A = { kind: 'arena', W: ARENA.W, D: ARENA.D, WALL_H: ARENA.WALL_H, solids: ARENA.solids, barrels: ARENA.barrels, spawns: ARENA.spawns };
+  const A = { kind: 'arena', W: ARENA.W, D: ARENA.D, WALL_H: ARENA.WALL_H, solids: ARENA.solids, barrels: ARENA.barrels, spawns: ARENA.spawns, vents: ARENA.vents, exits: ARENA.exits };
   A.pads = ARENA.pads.map(p => Object.assign({ gi: 0, lat: 0 }, p));
   const RW = 1.4, GRAV = 25;
   // highest drivable top under (x, z) not above maxY
@@ -197,15 +225,7 @@ function buildArena() {
     }
     return true;
   };
-  // set routes the AI can follow: over the deck (both ways) and through the tunnel (both ways)
-  A.routes = [
-    [[0, 40], [0, 20], [0, 8], [0, -8], [0, -20], [0, -40]],
-    [[0, -40], [0, -20], [0, -8], [0, 8], [0, 20], [0, 40]],
-    [[-40, 0], [-24, 0], [0, 0], [24, 0], [40, 0]],
-    [[40, 0], [24, 0], [0, 0], [-24, 0], [-40, 0]],
-    [[-48, -20], [-48, -6], [-48, 8], [-48, 20]],
-    [[48, 20], [48, 6], [48, -8], [48, -20]]
-  ];
+  A.routes = ARENA.routes;
   return A;
 }
 
@@ -294,7 +314,7 @@ function createRace(T, opts) {
   const D = DIFFS[opts.diff] || DIFFS.detenu;
   const ARENA_MODE = T.kind === 'arena', ARM = ARENA_MODE ? C.ARENA_ARM : C.ARM_DELAY;
   const R = {
-    mode: ARENA_MODE ? 'arena' : 'race', over: false, warned: 0,
+    mode: ARENA_MODE ? 'arena' : 'race', over: false, warned: 0, vent: 0,
     barrels: ARENA_MODE ? T.barrels.map(b => ({ x: b[0], z: b[1], y: b[2] || 0, hp: 20, alive: true, t: 0, by: null })) : [],
     cars: [], bullets: [], rockets: [], mines: [], slicks: [], puffs: [], events: [],
     tick: 0, time: 0, raceTime: 0, phase: 'countdown', cdT: 3.6, cdShown: 0, nextId: 1,
@@ -328,7 +348,7 @@ function createRace(T, opts) {
     if (ARENA_MODE) {
       const sp = T.spawns[c.slot], h = Math.atan2(-sp[0], -sp[1]);
       Object.assign(c, {
-        idx: 0, prevIdx: 0, x: sp[0], z: sp[1], h, vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0, armor: 100, alive: true, y: 0, vy: 0, air: false, finished: false, finishTime: 0,
+        idx: 0, prevIdx: 0, x: sp[0], z: sp[1], h, vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0, armor: 100, alive: true, y: 0, vy: 0, air: false, shield: 0, shieldT: 0, finished: false, finishTime: 0,
         progress: 0, nitro: 1, turboOn: false, rockets: 3, rear: null, rearN: 0, heat: 0, overheat: 0, lastShot: 9,
         fireCd: 0, rocketCd: 0, kills: 0, lastHitBy: null, turretYaw: h, aimYaw: h, turretPitch: 0, aimPitch: 0, oil: 0, oilSpin: 0,
         smokeT: 0, smokeEmit: 0, wreckT: 0, drifting: false, speedMul: 1, respawnT: 0, invuln: 0, deaths: 0, lap: 0
@@ -340,7 +360,7 @@ function createRace(T, opts) {
     const i = (N - 12 - row * 9 - (slot % 2) * 3 + N) % N;
     Object.assign(c, {
       idx: i, prevIdx: i, x: T.PX[i] + T.NX[i] * lane, z: T.PZ[i] + T.NZ[i] * lane, h: T.tangAng(i),
-      vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0, armor: 100, alive: true, y: 0, vy: 0, air: false, finished: false, finishTime: 0,
+      vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0, armor: 100, alive: true, y: 0, vy: 0, air: false, shield: 0, shieldT: 0, finished: false, finishTime: 0,
       progress: i - N, nitro: 1, turboOn: false, rockets: 3, rear: null, rearN: 0, heat: 0, overheat: 0, lastShot: 9,
       fireCd: 0, rocketCd: 0, kills: 0, lastHitBy: null, turretYaw: T.tangAng(i), aimYaw: T.tangAng(i), turretPitch: 0, aimPitch: 0, oil: 0, oilSpin: 0,
       smokeT: 0, smokeEmit: 0, wreckT: 0, drifting: false, speedMul: 1, respawnT: 0, invuln: 0, deaths: 0, lap: 0
@@ -388,6 +408,7 @@ function createRace(T, opts) {
   function pickup(c, p) {
     if (p.type === 'rocket') { if (c.rockets >= 6) return false; c.rockets = Math.min(6, c.rockets + 2); }
     else if (p.type === 'repair') { if (c.armor >= 100) return false; c.armor = Math.min(100, c.armor + 35); }
+    else if (p.type === 'shield') { if (c.shield >= 45) return false; c.shield = 50; c.shieldT = 15; }
     else { c.rear = REAR_KEYS[Math.floor(Math.random() * 3)]; c.rearN = REAR_N[c.rear]; }
     ev({ e: 'pick', c: c.id, type: p.type, rear: c.rear, n: c.rearN });
     return true;
@@ -395,6 +416,7 @@ function createRace(T, opts) {
   function damage(c, amt, src) {
     if (!c.alive || c.finished || R.phase !== 'race' || c.invuln > 0) return;
     if (src && src !== c && !src.human && c.human) amt *= D.dmg;
+    if (c.shield > 0) { const a = Math.min(c.shield, amt); c.shield -= a; amt -= a; }
     c.armor -= amt;
     if (src && src !== c) c.lastHitBy = src;
     if (c.human || (src && src.human)) ev({ e: 'hit', v: c.id, s: src && src !== c ? src.id : -1, a: r2(amt) });
@@ -419,7 +441,7 @@ function createRace(T, opts) {
         if (near > bd) { bd = near; best = sp; }
       }
       const h = Math.atan2(-best[0], -best[1]);
-      Object.assign(c, { x: best[0], z: best[1], h, vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0, armor: 100, alive: true, y: 0, vy: 0, air: false, invuln: 2, wreckT: 0, oil: 0, smokeT: 0, heat: 0, overheat: 0, rockets: Math.max(c.rockets, 1) });
+      Object.assign(c, { x: best[0], z: best[1], h, vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0, armor: 100, alive: true, y: 0, vy: 0, air: false, shield: 0, shieldT: 0, invuln: 2, wreckT: 0, oil: 0, smokeT: 0, heat: 0, overheat: 0, rockets: Math.max(c.rockets, 1) });
       c.turretYaw = c.aimYaw = c.h; c.turretPitch = c.aimPitch = 0;
       ev({ e: 'respawn', c: c.id });
       return;
@@ -432,7 +454,7 @@ function createRace(T, opts) {
     }
     Object.assign(c, {
       x: T.PX[i] + T.NX[i] * lane, z: T.PZ[i] + T.NZ[i] * lane, h: T.tangAng(i), idx: i, vx: 0, vz: 0, vF: 0, vL: 0, steerSm: 0,
-      armor: 100, alive: true, y: 0, vy: 0, air: false, invuln: 2, wreckT: 0, oil: 0, smokeT: 0, heat: 0, overheat: 0, rockets: Math.max(c.rockets, 1)
+      armor: 100, alive: true, y: 0, vy: 0, air: false, shield: 0, shieldT: 0, invuln: 2, wreckT: 0, oil: 0, smokeT: 0, heat: 0, overheat: 0, rockets: Math.max(c.rockets, 1)
     });
     c.turretYaw = c.aimYaw = c.h; c.turretPitch = c.aimPitch = 0;
     ev({ e: 'respawn', c: c.id });
@@ -457,9 +479,10 @@ function createRace(T, opts) {
   }
 
   // ---------- physics (shared with client-side prediction) ----------
+  const WALL_MIN = ARENA_MODE ? 15 : 9, WALL_K = ARENA_MODE ? 0.3 : 0.6;
   function onWall(c, vn, wx, wz) {
-    if (vn > 9) {
-      damage(c, (vn - 9) * 0.6, null);
+    if (vn > WALL_MIN) {
+      damage(c, (vn - WALL_MIN) * WALL_K, null);
       ev({ e: 'sp', x: r2(wx), y: r2((c.y || 0) + 1), z: r2(wz), n: 10, s: 9 });
       ev({ e: 'thud', x: r2(wx), z: r2(wz), k: r2(vn / 40), c: c.id });
     } else if (vn > 2 && Math.random() < 0.3) ev({ e: 'sp', x: r2(wx), y: r2((c.y || 0) + 0.8), z: r2(wz), n: 2, s: 5 });
@@ -604,13 +627,26 @@ function createRace(T, opts) {
     let dx, dz;
     const t = a.target && a.target.alive ? a.target : null;
     let pad = null;
-    if (c.armor < 50 || c.rockets === 0) {
+    {
       let bd = 70;
       for (const p of R.pads) {
-        if (!p.active || (p.type !== (c.armor < 50 ? 'repair' : 'rocket')) || Math.abs((p.y || 0) - (c.y || 0)) > 1) continue;
-        const d = Math.hypot(p.x - c.x, p.z - c.z); if (d < bd) { bd = d; pad = p; }
+        if (!p.active) continue;
+        const want = p.type === 'shield' ? c.shield <= 0 : p.type === (c.armor < 50 ? 'repair' : 'rocket') && (c.armor < 50 || c.rockets === 0);
+        if (!want || Math.abs((p.y || 0) - (c.y || 0)) > (p.type === 'shield' ? 2.1 : 1) || (p.y > 2.5 && R.vent)) continue;
+        const d = Math.hypot(p.x - c.x, p.z - c.z) * (p.type === 'shield' ? 0.6 : 1); if (d < bd) { bd = d; pad = p; }
       }
     }
+    // vents warming up: leave the platform by the nearest exit
+    if (R.vent && (c.y || 0) > 2.5) {
+      for (let k = 0; k < T.vents.length; k++) {
+        const vt = T.vents[k];
+        if (c.x > vt.x0 - 2 && c.x < vt.x1 + 2 && c.z > vt.z0 - 2 && c.z < vt.z1 + 2) {
+          const ex = T.exits[k].slice().sort((a2, b2) => Math.hypot(a2[0] - c.x, a2[1] - c.z) - Math.hypot(b2[0] - c.x, b2[1] - c.z))[0];
+          a.route = [ex]; a.ri = 0; pad = null; break;
+        }
+      }
+    }
+    if (a.route && a.routeDeck && R.vent && (c.y || 0) < 2.5) a.route = null;
     if (a.route && (pad || (t && Math.hypot(t.x - c.x, t.z - c.z) < 25))) a.route = null;
     if (a.route) {
       const wp = a.route[a.ri];
@@ -619,8 +655,8 @@ function createRace(T, opts) {
     if (!a.route && !pad && a.wt <= 0 && Math.random() < 0.5) {
       // start a run over the deck, through the tunnel or over a jump, from the nearest end
       let best = null, bd = Infinity;
-      for (const rt of T.routes) { const d = Math.hypot(rt[0][0] - c.x, rt[0][1] - c.z); if (d < bd) { bd = d; best = rt; } }
-      if (best && bd < 60) { a.route = best; a.ri = 0; a.wt = 12; }
+      for (const rt of T.routes) { if (rt.deck && R.vent) continue; const d = Math.hypot(rt.pts[0][0] - c.x, rt.pts[0][1] - c.z); if (d < bd) { bd = d; best = rt; } }
+      if (best && bd < 60) { a.route = best.pts; a.routeDeck = !!best.deck; a.ri = 0; a.wt = 12; }
     }
     if (a.route) { dx = a.route[a.ri][0]; dz = a.route[a.ri][1]; }
     else if (pad) { dx = pad.x; dz = pad.z; }
@@ -782,9 +818,20 @@ function createRace(T, opts) {
       if (!p.active) { p.t -= dt; if (p.t <= 0) p.active = true; continue; }
       for (const c of R.cars) {
         if (!c.alive || c.finished) continue;
-        if ((c.x - p.x) ** 2 + (c.z - p.z) ** 2 < 7 && Math.abs((c.y || 0) - (p.y || 0)) < 1.5 && pickup(c, p)) { p.active = false; p.t = 8; break; }
+        if ((c.x - p.x) ** 2 + (c.z - p.z) ** 2 < 7 && Math.abs((c.y || 0) - (p.y || 0)) < 1.5 && pickup(c, p)) { p.active = false; p.t = p.type === 'shield' ? 25 : 8; break; }
       }
     }
+    // arena vents: warning at 15 s of each 20 s cycle, fire from 17 s
+    if (ARENA_MODE && R.phase === 'race') {
+      const t = R.raceTime % 20, v = t < 15 ? 0 : t < 17 ? 1 : 2;
+      if (v !== R.vent) { R.vent = v; ev({ e: 'vent', p: v }); }
+      if (v === 2) for (const c of R.cars) {
+        if (!c.alive || (c.y || 0) < T.vents[0].y - 0.4) continue;
+        for (const vt of T.vents) if (c.x > vt.x0 && c.x < vt.x1 && c.z > vt.z0 && c.z < vt.z1) { damage(c, 22 * dt, null); break; }
+      }
+    }
+    // shields fade after 15 s
+    for (const c of R.cars) if (c.shieldT > 0) { c.shieldT -= dt; if (c.shieldT <= 0) c.shield = 0; }
     // respawn & invulnerability
     for (const c of R.cars) {
       if (!c.alive && c.respawnT > 0) { c.respawnT -= dt; if (c.respawnT <= 0) respawn(c); }
@@ -826,12 +873,12 @@ function createRace(T, opts) {
 
   function snapshot() {
     const out = {
-      t: 's', tk: R.tick, ph: R.phase, rt: r2(R.raceTime), md: R.mode,
+      t: 's', tk: R.tick, ph: R.phase, rt: r2(R.raceTime), md: R.mode, vt: R.vent,
       c: R.cars.map(c => [
         r2(c.x), r2(c.z), r3(c.h), r2(c.vF), r2(c.vL), r3(c.turretYaw), r2(c.armor),
         (c.alive ? FL.alive : 0) | (c.finished ? FL.finished : 0) | (c.turboOn ? FL.turbo : 0) | (c.drifting ? FL.drifting : 0) | (c.oil > 0 ? FL.oil : 0) | (c.air ? FL.air : 0),
         r2(c.steerSm), r2(c.nitro), c.rockets, c.rear ? REAR_CODE[c.rear] : 0, c.rearN, r2(c.heat), r2(c.overheat), Math.round(c.progress),
-        r2(c.finishTime), c.kills, c.deaths, r2(c.respawnT), r2(c.smokeT), r2(c.invuln), r3(c.turretPitch), r2(Math.max(0, c.oil)), r2(c.oilSpin), r2(c.y || 0), r2(c.vy || 0)
+        r2(c.finishTime), c.kills, c.deaths, r2(c.respawnT), r2(c.smokeT), r2(c.invuln), r3(c.turretPitch), r2(Math.max(0, c.oil)), r2(c.oilSpin), r2(c.y || 0), r2(c.vy || 0), Math.ceil(c.shield || 0)
       ]),
       r: R.rockets.map(r => [r.id, r2(r.x), r2(r.z), r3(r.h), r2(r.y)]),
       m: R.mines.map(m => [m.id, r2(m.x), r2(m.z), m.arm <= 0 ? 1 : 0, r2(m.y || 0)]),

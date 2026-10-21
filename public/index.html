@@ -52,6 +52,8 @@ body.racing #game{cursor:none}
 .bar{height:14px;background:rgba(255,255,255,.08);border:1px solid var(--line);position:relative;overflow:hidden}
 .bar i{position:absolute;inset:0 auto 0 0;background:var(--bone);transition:width .12s linear}
 .bar.armor i.low{background:var(--blood)}
+.bar.armor i.sh{background:#4aa8ff;box-shadow:0 0 8px #4aa8ff}
+.gauge{grid-template-columns:78px minmax(0,1fr) 64px!important}
 .bar.nitro i{background:linear-gradient(90deg,#3d8bff,#9fd0ff)}
 .gauge b{font-size:20px;text-align:right}
 .hud-br{bottom:calc(18px + env(safe-area-inset-bottom,0px));right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:10px;justify-items:end}
@@ -180,7 +182,7 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
   <canvas id="minimap" class="hud" width="360" height="360"></canvas>
   <div id="driverHud">
     <div class="hud hud-bl">
-      <div class="gauge"><span class="lbl">BLINDAGE</span><div class="bar armor"><i id="hArmor" style="width:100%"></i></div><b id="hArmorN">100</b></div>
+      <div class="gauge"><span class="lbl">BLINDAGE</span><div class="bar armor"><i id="hArmor" style="width:100%"></i><i id="hShield" class="sh" style="width:0"></i></div><b id="hArmorN">100</b></div>
       <div class="gauge"><span class="lbl">TURBO</span><div class="bar nitro"><i id="hNitro" style="width:100%"></i></div><b id="hNitroN">100</b></div>
     </div>
     <div class="hud hud-br">
@@ -217,7 +219,7 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
   <div class="panel">
     <p class="eyebrow">Pénitencier de Fort-Ardoise · Réseau local</p>
     <h1>IRON CIRCUIT</h1>
-    <p class="lede">Six voitures blindées, aucune règle. <b>Course</b> : trois tours, le premier sous le drapeau à damier gagne. <b>Arène</b> : trois minutes de match à mort sur un terrain à rampes et tunnel, le premier à 10 destructions gagne.</p>
+    <p class="lede">Six voitures blindées, aucune règle. <b>Course</b> : trois tours, le premier sous le drapeau à damier gagne. <b>Arène</b> : trois minutes de match à mort sur un terrain à reliefs (plateformes aux grilles brûlantes, colline et bouclier au centre), le premier à 10 destructions gagne.</p>
     <div class="row" id="soloRow" hidden>
       <div class="diff">
         <span class="lbl">MODE</span>
@@ -265,6 +267,7 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
       <span><i style="background:#e0402f"></i>Rouge : +2 roquettes</span>
       <span><i style="background:#ffb22e"></i>Ambre : arme arrière</span>
       <span><i style="background:#3fc28a"></i>Verte : +35 blindage</span>
+      <span><i style="background:#4aa8ff"></i>Bleue (arène) : bouclier +50</span>
     </div>
     <div class="settings" data-settings></div>
     <p class="note" id="joinNote">Connexion au serveur…</p>
@@ -445,8 +448,8 @@ const wallTex = (() => {
 const concreteTex = (() => { const [c, g] = cv(64, 64); g.fillStyle = '#6a6761'; g.fillRect(0, 0, 64, 64); speckle(g, 64, 64, 300, ['#5a5752', '#77746d']); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; })();
 const groundTex = (() => { const [c, g] = cv(256, 256); g.fillStyle = '#17171a'; g.fillRect(0, 0, 256, 256); speckle(g, 256, 256, 5000, ['#1d1c1f', '#121214', '#232125', '#1a1816']); const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(90, 90); return t; })();
 const checkerTex = (() => { const [c, g] = cv(256, 32); for (let x = 0; x < 16; x++) for (let y = 0; y < 2; y++) { g.fillStyle = (x + y) % 2 ? '#111' : '#eee'; g.fillRect(x * 16, y * 16, 16, 16); } return new THREE.CanvasTexture(c); })();
-const PAD_COL = { rocket: '#e0402f', rear: '#ffb22e', repair: '#3fc28a' };
-const PAD_TXT = { rocket: 'ROQUETTES', rear: 'ARRIÈRE', repair: 'RÉPARATION' };
+const PAD_COL = { rocket: '#e0402f', rear: '#ffb22e', repair: '#3fc28a', shield: '#4aa8ff' };
+const PAD_TXT = { rocket: 'ROQUETTES', rear: 'ARRIÈRE', repair: 'RÉPARATION', shield: 'BOUCLIER' };
 function padTex(type) {
   const [c, g] = cv(128, 128), col = PAD_COL[type];
   g.fillStyle = '#0f1114'; g.fillRect(0, 0, 128, 128);
@@ -461,12 +464,16 @@ function padTex(type) {
   } else if (type === 'rear') {
     g.beginPath(); g.arc(0, 0, 15, 0, TAU); g.fill(); g.lineWidth = 5;
     for (let k = 0; k < 8; k++) { const a = k * TAU / 8; g.beginPath(); g.moveTo(Math.cos(a) * 14, Math.sin(a) * 14); g.lineTo(Math.cos(a) * 26, Math.sin(a) * 26); g.stroke(); }
+  } else if (type === 'shield') {
+    g.lineWidth = 7; g.beginPath();
+    for (let k = 0; k < 6; k++) { const a = k * TAU / 6 - PI / 2; g[k ? 'lineTo' : 'moveTo'](Math.cos(a) * 24, Math.sin(a) * 24); }
+    g.closePath(); g.stroke(); g.beginPath(); g.arc(0, 0, 8, 0, TAU); g.fill();
   } else { g.fillRect(-8, -26, 16, 52); g.fillRect(-26, -8, 52, 16); }
   g.restore();
   g.font = '700 15px "Saira Condensed", "Arial Narrow", sans-serif'; g.textAlign = 'center'; g.fillText(PAD_TXT[type], 64, 112);
   return new THREE.CanvasTexture(c);
 }
-const padTexs = { rocket: padTex('rocket'), rear: padTex('rear'), repair: padTex('repair') };
+const padTexs = { rocket: padTex('rocket'), rear: padTex('rear'), repair: padTex('repair'), shield: padTex('shield') };
 
 /* ================= Track ================= */
 function ribbon(offA, offB, yA, yB, vScale) {
@@ -575,7 +582,7 @@ const padDummy = new THREE.Object3D(); padDummy.rotation.order = 'YXZ';
 const padGlows = [];
 function buildPads(list, root, rot) {
   const im = {}, glow = new THREE.InstancedMesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({ map: radialTex, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }), list.length);
-  for (const type of ['rocket', 'rear', 'repair']) {
+  for (const type of ['rocket', 'rear', 'repair', 'shield']) {
     im[type] = new THREE.InstancedMesh(new THREE.PlaneGeometry(3.8, 3.8), new THREE.MeshBasicMaterial({ map: padTexs[type] }), Math.max(1, list.filter(p => p.type === type).length));
     im[type].count = 0; root.add(im[type]);
   }
@@ -600,6 +607,7 @@ const trackPads = buildPads(T.pads, trackRoot, p => tangAng(p.gi) + PI);
 
 /* ================= Arena scenery ================= */
 const arenaSolidMeshes = [];
+const ventGlowMat = new THREE.MeshBasicMaterial({ color: 0xff5a1a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
 let barrelIM = null;
 {
   const AW = AR.W, AD = AR.D;
@@ -642,20 +650,30 @@ let barrelIM = null;
     }
     g.computeVertexNormals();
     const top = Math.max(sd.h0, sd.h1);
-    const mat = sd.ax ? (top < 3 ? kickMat : rampMat) : top >= 4 ? deckMat : coverMats[k % coverMats.length];
+    const big = (sd.x1 - sd.x0) * (sd.z1 - sd.z0) > 100;
+    const mat = sd.ax ? (top < 2 ? kickMat : rampMat) : big ? deckMat : coverMats[k % coverMats.length];
     add(new THREE.Mesh(g, mat));
   });
-  // yellow edge on the deck and on the jump ramps' lips
+  // yellow-and-black edges around platform and hill tops
   const edgeMat = new THREE.MeshBasicMaterial({ map: stripeTex });
-  for (const [w, d, x, z] of [[44, 0.5, 0, 11.75], [44, 0.5, 0, -11.75], [0.5, 24, 21.75, 0], [0.5, 24, -21.75, 0]]) add(new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d), edgeMat)).position.set(x, 4.03, z);
-  // hazard frame around both tunnel mouths
-  for (const sx of [-1, 1]) {
-    for (const z of [-5.15, 5.15]) add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 3.4, 0.3), edgeMat)).position.set(sx * 22.2, 1.7, z);
-    add(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 10.6), edgeMat)).position.set(sx * 22.2, 3.15, 0);
+  for (const sd of AR.solids) {
+    if (sd.ax || (sd.x1 - sd.x0) * (sd.z1 - sd.z0) <= 100) continue;
+    const y = sd.h1 + 0.03, w = sd.x1 - sd.x0, d = sd.z1 - sd.z0, cx = (sd.x0 + sd.x1) / 2, cz = (sd.z0 + sd.z1) / 2;
+    for (const [bw, bd, x, z] of [[w, 0.5, cx, sd.z0 + 0.25], [w, 0.5, cx, sd.z1 - 0.25], [0.5, d, sd.x0 + 0.25, cz], [0.5, d, sd.x1 - 0.25, cz]]) add(new THREE.Mesh(new THREE.BoxGeometry(bw, 0.06, bd), edgeMat)).position.set(x, y, z);
   }
-  // lamps under the deck so the tunnel is readable
-  const lampMat = new THREE.MeshBasicMaterial({ color: 0xffc46a });
-  for (const x of [-16, -6, 6, 16]) add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, 0.5), lampMat)).position.set(x, 3.33, 0);
+  // burning vents: steel grates on the platform tops, plus a glow that warns then burns
+  const grateTex = (() => {
+    const [c, g] = cv(64, 64); g.fillStyle = '#26282c'; g.fillRect(0, 0, 64, 64); g.fillStyle = '#0b0b0c';
+    for (let y = 6; y < 64; y += 10) g.fillRect(6, y, 52, 4);
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  })();
+  for (const vt of AR.vents) {
+    const w = vt.x1 - vt.x0 - 2, d = vt.z1 - vt.z0 - 2, tex = grateTex.clone(); tex.needsUpdate = true; tex.repeat.set(w / 4, d / 4);
+    const gr = add(new THREE.Mesh(new THREE.PlaneGeometry(w, d), stdMat({ map: tex, roughness: 0.6, metalness: 0.6 })));
+    gr.rotation.x = -PI / 2; gr.position.set((vt.x0 + vt.x1) / 2, vt.y + 0.02, (vt.z0 + vt.z1) / 2);
+    const gl = add(new THREE.Mesh(new THREE.PlaneGeometry(w, d), ventGlowMat));
+    gl.rotation.x = -PI / 2; gl.position.set((vt.x0 + vt.x1) / 2, vt.y + 0.05, (vt.z0 + vt.z1) / 2);
+  }
   // corner floodlights
   const poleMat = stdMat({ color: 0x2b2e33, roughness: 0.6, metalness: 0.6 }), headMat = new THREE.MeshBasicMaterial({ color: 0xffd38a });
   const poolMat = new THREE.MeshBasicMaterial({ map: radialTex, color: 0xffa040, transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -676,7 +694,7 @@ let barrelIM = null;
   }
   cont.count = n; arenaRoot.add(cont);
   mergeScenery(arenaRoot.children.filter(o => o.isMesh && !o.isInstancedMesh), arenaRoot);
-  for (const o of arenaRoot.children) if (o.isMesh && !o.isInstancedMesh) arenaSolidMeshes.push(o);
+  for (const o of arenaRoot.children) if (o.isMesh && !o.isInstancedMesh && o.material !== ventGlowMat) arenaSolidMeshes.push(o);
   // destructible barrels
   barrelIM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.6, 0.6, 1.3, 12), stdMat({ color: 0xffffff, roughness: 0.6, metalness: 0.5 }), AR.barrels.length);
   AR.barrels.forEach((b, i) => { dummy.position.set(b[0], (b[2] || 0) + 0.65, b[1]); dummy.rotation.set(0, i, 0); dummy.updateMatrix(); barrelIM.setMatrixAt(i, dummy.matrix); barrelIM.setColorAt(i, new THREE.Color(0xc0302a)); });
@@ -826,6 +844,7 @@ const sfx = (() => {
 /* ================= Cars ================= */
 const shadowMat = new THREE.MeshBasicMaterial({ map: radialTex, color: 0x000000, transparent: true, opacity: 0.8, depthWrite: false });
 const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.5, 14);
+const bubbleGeo = new THREE.SphereGeometry(1, 18, 12);
 function buildCar(def) {
   const g = new THREE.Group(), mats = [];
   const M = (color, o = {}) => { const m = stdMat(Object.assign({ color, roughness: 0.6, metalness: 0.35 }, o)); mats.push({ m, c: color, e: o.emissive || 0 }); return m; };
@@ -864,6 +883,8 @@ function buildCar(def) {
   box(0.62, 0.36, 0.75, steel, 0, 0, 0.15, gun);
   for (const s of [-1, 1]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.5, 6), dark); b.rotation.x = PI / 2; b.position.set(s * 0.13, 0, 0.95); gun.add(b); }
   const sh = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 6), shadowMat); sh.rotation.x = -PI / 2; sh.position.y = 0.04; g.add(sh);
+  const bubble = new THREE.Mesh(bubbleGeo, new THREE.MeshBasicMaterial({ color: 0x4aa8ff, transparent: true, opacity: 0.2, depthWrite: false, blending: THREE.AdditiveBlending }));
+  bubble.scale.set(1.9, 1.35, 3.0); bubble.position.y = 1.1; bubble.visible = false; g.add(bubble);
   const partMat = () => stdMat({ color: 0xffffff, vertexColors: true, roughness: 0.5, metalness: 0.45 });
   const bodyMat = partMat(), turMat = partMat(), gunMat = partMat();
   mergeColored(body, bodyMat); mergeColored(tur, turMat); mergeColored(gun, gunMat);
@@ -871,7 +892,7 @@ function buildCar(def) {
   for (const m of [bodyMat, turMat, gunMat]) mats.push({ m, c: 0xffffff, e: 0 });
   mats.push({ m: tire, c: 0x0d0d0e, e: 0 });
   scene.add(g);
-  return { g, body, tur, gun, wheels, mats };
+  return { g, body, tur, gun, wheels, mats, bubble };
 }
 // Geometry merging: many small meshes become one draw call.
 function bake(mesh, matrix) { return (mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone()).applyMatrix4(matrix); }
@@ -1181,6 +1202,7 @@ function handleEvent(e) {
       sfx.pickup();
       if (e.type === 'rocket') feed('+2 roquettes', 'good');
       else if (e.type === 'repair') feed('Réparation +35', 'heal');
+      else if (e.type === 'shield') feed('Bouclier +50 pendant 15 s', 'good');
       else feed(REAR_INFO[e.rear] + ' ×' + e.n + ' · touche E', 'good');
       break;
     case 'kill': {
@@ -1201,6 +1223,9 @@ function handleEvent(e) {
       break;
     }
     case 'left': feed('Plus que ' + e.s + ' s', 'bad'); break;
+    case 'vent':
+      if (e.p === 1 && myCar && myCar.st && (myCar.st.y || 0) > 2.5) { feed('Les grilles chauffent : quitte la plateforme !', 'bad'); sfx.overheat(); }
+      break;
     case 'over': feed('Fin du match', 'good'); break;
     case 'lap': if (mine(e.c)) feed(e.lap === LAPS ? 'Dernier tour' : 'Tour ' + e.lap + '/' + LAPS, 'good'); break;
     case 'fin': if (mine(e.c)) feed('Drapeau à damier !', 'good'); else feed(carById(e.c).name + ' passe la ligne', ''); break;
@@ -1437,7 +1462,7 @@ function interp(now) {
     s.x = L(F.x); s.z = L(F.z); s.y = L(F.y) || 0; s.vy = L(F.vy) || 0; s.h = LA(F.h); s.tur = LA(F.tur); s.tp = L(F.tp) || 0; s.vF = L(F.vF); s.vL = L(F.vL); s.steer = L(F.steer);
     s.armor = row[F.armor]; s.nitro = row[F.nitro]; s.rockets = row[F.rockets]; s.rear = REAR_BY_CODE[row[F.rear]]; s.rearN = row[F.rearN];
     s.heat = row[F.heat]; s.overheat = row[F.overheat]; s.progress = row[F.progress]; s.finishTime = row[F.finishTime];
-    s.kills = row[F.kills]; s.deaths = row[F.deaths]; s.respawnT = row[F.respawnT]; s.smokeT = row[F.smokeT]; s.invuln = row[F.invuln];
+    s.shield = row[F.shield] || 0; s.kills = row[F.kills]; s.deaths = row[F.deaths]; s.respawnT = row[F.respawnT]; s.smokeT = row[F.smokeT]; s.invuln = row[F.invuln];
     const fl = row[F.flags];
     s.alive = !!(fl & FL.alive); s.finished = !!(fl & FL.finished); s.turbo = !!(fl & FL.turbo); s.drifting = !!(fl & FL.drifting);
     if (c === myCar && pc.valid) {
@@ -1466,6 +1491,8 @@ function updateVisuals(dt, time) {
     c.body.rotation.z = clamp(-s.vL * 0.012, -0.12, 0.12);
     for (const w of c.wheels) { w.w.rotation.x += s.vF * dt / 0.55; if (w.front) w.piv.rotation.y = s.steer * 0.42; }
     c.g.visible = !(s.invuln > 0) || (time * 10 % 1) < 0.6;
+    c.bubble.visible = s.alive && s.shield > 0;
+    if (c.bubble.visible) c.bubble.material.opacity = 0.14 + 0.08 * Math.sin(time * 6) + 0.12 * (s.shield / 50);
     const fx_ = Math.sin(s.h), fz_ = Math.cos(s.h), sx = Math.cos(s.h), sz = -Math.sin(s.h);
     if (s.alive) {
       if (s.turbo) for (const q of [-0.7, 0.7]) fx.spawn(s.x - fx_ * 2.5 + sx * q, Y + 0.75, s.z - fz_ * 2.5 + sz * q, -fx_ * 8, 0, -fz_ * 8, 0.12, 0.8, 0.2, 0x6aa8ff, 1);
@@ -1498,6 +1525,11 @@ function updateVisuals(dt, time) {
   }
   trGeo.attributes.position.needsUpdate = true;
   for (const g of padGlows) g.material.opacity = 0.25 + 0.15 * Math.sin(time * 5);
+  const vt = MODE === 'arena' && curSnap && mode === 'race' ? curSnap.vt || 0 : 0;
+  ventGlowMat.opacity = vt === 1 ? ((time * 4) % 1 < 0.5 ? 0.35 : 0.05) : vt === 2 ? 0.4 + 0.15 * Math.sin(time * 30) : 0;
+  if (vt === 2) for (const v of AR.vents) for (let k = 0; k < 3; k++) {
+    fx.spawn(rnd(v.x0 + 1, v.x1 - 1), v.y + 0.2, rnd(v.z0 + 1, v.z1 - 1), rnd(-0.5, 0.5), rnd(3, 6), rnd(-0.5, 0.5), rnd(0.3, 0.6), 1.2, 0.3, Math.random() < 0.5 ? 0xff6a1a : 0xffb43a, 0.9);
+  }
   fx.update(dt); smoke.update(dt);
   for (const L of boomLights) { if (L.t > 0) { L.t -= dt; L.l.intensity = Math.max(0, L.t / 0.6) * 5; } else L.l.intensity = 0; }
 }
@@ -1617,7 +1649,8 @@ function updateHUD(dt) {
   H.lap.textContent = arena ? p.kills + '/' + C.ARENA_KILLS : Math.min(LAPS, Math.max(1, Math.floor(p.progress / N) + 1)) + '/' + LAPS;
   H.time.textContent = fmtTime(arena ? left : p.finished ? p.finishTime : rt);
   const a = Math.max(0, Math.ceil(p.armor));
-  H.armor.style.width = a + '%'; H.armor.classList.toggle('low', a <= 30); H.armorN.textContent = a;
+  H.armor.style.width = a + '%'; H.armor.classList.toggle('low', a <= 30); H.armorN.textContent = a + (p.shield > 0 ? '+' + p.shield : '');
+  $('hShield').style.width = (p.shield || 0) + '%';
   H.nitro.style.width = (p.nitro * 100).toFixed(0) + '%'; H.nitroN.textContent = (p.nitro * 100).toFixed(0);
   H.speed.textContent = Math.round(Math.abs(p.vF) * C.KMH);
   H.rockets.textContent = p.rockets;
@@ -1640,9 +1673,10 @@ function drawArenaMap() {
   mg.strokeStyle = '#5b616b'; mg.lineWidth = 3; mg.strokeRect(M.X(AR.W), M.Y(AR.D), AR.W * 2 * M.s, AR.D * 2 * M.s);
   for (const sd of AR.solids) {
     const top = Math.max(sd.h0, sd.h1);
-    mg.fillStyle = sd.ax ? (top < 3 ? '#8a6a28' : '#59606b') : top >= 4 ? (sd.b > 0 ? 'rgba(90,96,106,.55)' : '#4b515b') : '#3a3f48';
+    mg.fillStyle = sd.ax ? (top < 2 ? '#8a6a28' : '#59606b') : (sd.x1 - sd.x0) * (sd.z1 - sd.z0) > 100 ? '#4b515b' : '#3a3f48';
     mg.fillRect(M.X(sd.x1), M.Y(sd.z1), (sd.x1 - sd.x0) * M.s, (sd.z1 - sd.z0) * M.s);
   }
+  if (curSnap && curSnap.vt) { mg.fillStyle = curSnap.vt === 2 ? 'rgba(255,90,26,.55)' : 'rgba(255,90,26,.25)'; for (const v of AR.vents) mg.fillRect(M.X(v.x1), M.Y(v.z1), (v.x1 - v.x0) * M.s, (v.z1 - v.z0) * M.s); }
   for (const p of pads) { if (!p.active) continue; mg.fillStyle = PAD_COL[p.type]; mg.fillRect(M.X(p.x) - 3, M.Y(p.z) - 3, 6, 6); }
   for (const c of cars) {
     if (c.mine || !c.st) continue;
@@ -1714,8 +1748,8 @@ function updateCamera(dt, time) {
   const lead = (mode === 'race' || mode === 'results') && cars.length && cars[0].st ? ranking()[0].st : null;
   const preview = !lead && MODE === 'arena';   // menus: slow tour of the selected map
   const fxp = lead ? lead.x : preview ? 0 : PX[0], fzp = lead ? lead.z : preview ? 0 : PZ[0], fyp = lead ? (lead.y || 0) : 0;
-  const r = lead ? 17 : preview ? 62 : 34, a = time * (lead ? 0.18 : 0.08);
-  tmpV.set(fxp + Math.cos(a) * r, fyp + (lead ? 6.5 : preview ? 26 : 12), fzp + Math.sin(a) * r);
+  const r = lead ? 17 : preview ? AR.W * 0.85 : 34, a = time * (lead ? 0.18 : 0.08);
+  tmpV.set(fxp + Math.cos(a) * r, fyp + (lead ? 6.5 : preview ? 34 : 12), fzp + Math.sin(a) * r);
   camPos.lerp(tmpV, Math.min(1, dt * 2));
   camera.position.copy(camPos);
   camLook.set(fxp, fyp + (preview ? 2 : 1.2), fzp); camera.lookAt(camLook);

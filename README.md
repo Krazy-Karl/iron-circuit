@@ -5,9 +5,10 @@ voitures blindées, tourelle à la souris, roquettes, pièges (huile, mines, fum
 plaques au sol. Deux modes :
 
 - **Course** : 3 tours d'un circuit de pénitencier de nuit, le premier sous le drapeau gagne.
-- **Arène** : 3 minutes de match à mort chacun pour soi dans une cour à reliefs (pont
-  central sur rampes, tunnel en dessous, tremplins, tonneaux explosifs). Le premier à
-  10 destructions gagne, sinon le meilleur score à la fin du temps.
+- **Arène** : 3 minutes de match à mort chacun pour soi dans une grande cour à reliefs
+  (deux plateformes d'angle aux grilles brûlantes, colline centrale avec un bouclier,
+  dos-d'âne, tremplins, tonneaux explosifs). Le premier à 10 destructions gagne, sinon
+  le meilleur score à la fin du temps.
 
 - **Solo** contre 5 pilotes IA, ou seul pour s'entraîner : ouvre `solo/iron-circuit.html` dans un navigateur
   (connexion Internet nécessaire pour charger le moteur 3D).
@@ -115,9 +116,19 @@ Le décor du mode choisi s'affiche en fond du salon.
   le meilleur score à la fin du temps (à égalité, celui qui a été le moins détruit).
 - Les armes s'activent après **3 secondes**. Les voitures détruites réapparaissent au
   point de départ le plus éloigné des adversaires.
-- Le terrain a du relief : monte sur le **pont central** par les rampes (des roquettes
-  t'y attendent), passe par le **tunnel** dessous, saute sur les **tremplins** jaunes.
-  On peut tomber du pont, et une chute trop violente abîme la voiture.
+- Le terrain a du relief :
+  - deux **plateformes** dans des coins opposés, chacune avec **deux rampes** sur deux côtés
+    différents (des roquettes t'y attendent). Leurs **grilles brûlent** : toutes les 20 s,
+    elles clignotent en orange pendant 2 s, puis brûlent 3 s. Impossible d'y camper ;
+  - au pied des plateformes, le tireur du haut **ne peut pas te toucher** (sa tourelle ne
+    descend que de 10°) : les blocs bas qui s'y trouvent servent d'approche à couvert ;
+  - une **colline centrale** accessible par les quatre côtés, avec le **bouclier** au sommet,
+    à découvert ;
+  - des **dos-d'âne** qui font décoller si on les prend vite, et deux **tremplins** jaunes.
+- **Bouclier** (plaque bleue) : +50 points qui encaissent les dégâts avant le blindage,
+  pendant 15 s au maximum (bulle bleue autour de la voiture, barre bleue dans le HUD).
+  Il réapparaît 25 s après avoir été pris.
+- Les chocs contre les obstacles font moins de dégâts qu'en course.
 - La tourelle vise aussi en hauteur (±10°) : utile pour tirer depuis le pont ou vers lui.
 - Les **tonneaux rouges** explosent quand on leur tire dessus (et les explosions se
   propagent). Ils réapparaissent 20 secondes plus tard.
