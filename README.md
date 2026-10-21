@@ -114,8 +114,8 @@ Le décor du mode choisi s'affiche en fond du salon.
 **En mode Arène**
 - Match de **3 minutes**, chacun pour soi. Le premier à **10 destructions** gagne ; sinon,
   le meilleur score à la fin du temps (à égalité, celui qui a été le moins détruit).
-- Les armes s'activent après **3 secondes**. Les voitures détruites réapparaissent au
-  point de départ le plus éloigné des adversaires.
+- Les armes sont actives **dès le départ** (en course, elles ne s'activent qu'après 5 s).
+  Les voitures détruites réapparaissent au point de départ le plus éloigné des adversaires.
 - Le terrain a du relief :
   - deux **plateformes** dans des coins opposés, chacune avec **deux rampes** sur deux côtés
     différents (des roquettes t'y attendent). Leurs **grilles brûlent** : toutes les 20 s,
@@ -130,7 +130,9 @@ Le décor du mode choisi s'affiche en fond du salon.
   - un **tunnel court** (20 m) passe aussi sous chaque plateforme, à côté de sa rampe ;
   - des **dos-d'âne** qui font décoller si on les prend vite, et deux **tremplins** jaunes.
 - **Bouclier** (plaque bleue) : +50 points qui encaissent les dégâts avant le blindage,
-  pendant 15 s au maximum (bulle bleue autour de la voiture, barre bleue dans le HUD).
+  pendant 15 s au maximum. Une bulle bleue entoure la voiture et clignote pendant les
+  3 dernières secondes ; le HUD affiche les points et les secondes restantes
+  (« 75 +50 · 9 s ») avec une fine ligne qui se vide sous la barre de blindage.
   Il réapparaît 25 s après avoir été pris.
 - Les chocs contre les obstacles font moins de dégâts qu'en course.
 - La tourelle vise aussi en hauteur (±10°) : utile pour tirer depuis le pont ou vers lui.

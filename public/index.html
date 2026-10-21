@@ -53,7 +53,9 @@ body.racing #game{cursor:none}
 .bar i{position:absolute;inset:0 auto 0 0;background:var(--bone);transition:width .12s linear}
 .bar.armor i.low{background:var(--blood)}
 .bar.armor i.sh{background:#4aa8ff;box-shadow:0 0 8px #4aa8ff}
-.gauge{grid-template-columns:78px minmax(0,1fr) 64px!important}
+.bar.armor i.sht{top:auto;height:3px;background:#d6ecff;transition:none}
+.gauge b.shb{font-size:17px}
+.gauge{grid-template-columns:78px minmax(0,1fr) 96px!important}
 .bar.nitro i{background:linear-gradient(90deg,#3d8bff,#9fd0ff)}
 .gauge b{font-size:20px;text-align:right}
 .hud-br{bottom:calc(18px + env(safe-area-inset-bottom,0px));right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:10px;justify-items:end}
@@ -182,7 +184,7 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
   <canvas id="minimap" class="hud" width="360" height="360"></canvas>
   <div id="driverHud">
     <div class="hud hud-bl">
-      <div class="gauge"><span class="lbl">BLINDAGE</span><div class="bar armor"><i id="hArmor" style="width:100%"></i><i id="hShield" class="sh" style="width:0"></i></div><b id="hArmorN">100</b></div>
+      <div class="gauge"><span class="lbl">BLINDAGE</span><div class="bar armor"><i id="hArmor" style="width:100%"></i><i id="hShield" class="sh" style="width:0"></i><i id="hShieldT" class="sht" style="width:0"></i></div><b id="hArmorN">100</b></div>
       <div class="gauge"><span class="lbl">TURBO</span><div class="bar nitro"><i id="hNitro" style="width:100%"></i></div><b id="hNitroN">100</b></div>
     </div>
     <div class="hud hud-br">
@@ -1482,7 +1484,7 @@ function interp(now) {
     s.x = L(F.x); s.z = L(F.z); s.y = L(F.y) || 0; s.vy = L(F.vy) || 0; s.h = LA(F.h); s.tur = LA(F.tur); s.tp = L(F.tp) || 0; s.vF = L(F.vF); s.vL = L(F.vL); s.steer = L(F.steer);
     s.armor = row[F.armor]; s.nitro = row[F.nitro]; s.rockets = row[F.rockets]; s.rear = REAR_BY_CODE[row[F.rear]]; s.rearN = row[F.rearN];
     s.heat = row[F.heat]; s.overheat = row[F.overheat]; s.progress = row[F.progress]; s.finishTime = row[F.finishTime];
-    s.shield = row[F.shield] || 0; s.kills = row[F.kills]; s.deaths = row[F.deaths]; s.respawnT = row[F.respawnT]; s.smokeT = row[F.smokeT]; s.invuln = row[F.invuln];
+    s.shield = row[F.shield] || 0; s.shieldT = row[F.shieldT] || 0; s.kills = row[F.kills]; s.deaths = row[F.deaths]; s.respawnT = row[F.respawnT]; s.smokeT = row[F.smokeT]; s.invuln = row[F.invuln];
     const fl = row[F.flags];
     s.alive = !!(fl & FL.alive); s.finished = !!(fl & FL.finished); s.turbo = !!(fl & FL.turbo); s.drifting = !!(fl & FL.drifting);
     if (c === myCar && pc.valid) {
@@ -1511,7 +1513,8 @@ function updateVisuals(dt, time) {
     c.body.rotation.z = clamp(-s.vL * 0.012, -0.12, 0.12);
     for (const w of c.wheels) { w.w.rotation.x += s.vF * dt / 0.55; if (w.front) w.piv.rotation.y = s.steer * 0.42; }
     c.g.visible = !(s.invuln > 0) || (time * 10 % 1) < 0.6;
-    c.bubble.visible = s.alive && s.shield > 0;
+    // the bubble blinks during the last 3 seconds
+    c.bubble.visible = s.alive && s.shield > 0 && (s.shieldT > 3 || (time * 8) % 1 < 0.6);
     if (c.bubble.visible) c.bubble.material.opacity = 0.14 + 0.08 * Math.sin(time * 6) + 0.12 * (s.shield / 50);
     const fx_ = Math.sin(s.h), fz_ = Math.cos(s.h), sx = Math.cos(s.h), sz = -Math.sin(s.h);
     if (s.alive) {
@@ -1669,8 +1672,10 @@ function updateHUD(dt) {
   H.lap.textContent = arena ? p.kills + '/' + C.ARENA_KILLS : Math.min(LAPS, Math.max(1, Math.floor(p.progress / N) + 1)) + '/' + LAPS;
   H.time.textContent = fmtTime(arena ? left : p.finished ? p.finishTime : rt);
   const a = Math.max(0, Math.ceil(p.armor));
-  H.armor.style.width = a + '%'; H.armor.classList.toggle('low', a <= 30); H.armorN.textContent = a + (p.shield > 0 ? '+' + p.shield : '');
+  H.armor.style.width = a + '%'; H.armor.classList.toggle('low', a <= 30); H.armorN.textContent = a + (p.shield > 0 ? ' +' + p.shield + ' · ' + Math.ceil(p.shieldT) + ' s' : '');
+  H.armorN.classList.toggle('shb', p.shield > 0);
   $('hShield').style.width = (p.shield || 0) + '%';
+  $('hShieldT').style.width = (p.shield > 0 ? p.shieldT / 15 * 100 : 0) + '%';
   H.nitro.style.width = (p.nitro * 100).toFixed(0) + '%'; H.nitroN.textContent = (p.nitro * 100).toFixed(0);
   H.speed.textContent = Math.round(Math.abs(p.vF) * C.KMH);
   H.rockets.textContent = p.rockets;

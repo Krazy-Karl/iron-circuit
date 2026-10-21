@@ -21,7 +21,7 @@ function mulberry(seed) {
 const C = {
   LAPS: 3, N: 1200, HALF_W: 11, CAR_R: 1.5, BASE_MAX: 36, KMH: 2.8,
   TURRET_ARC: 75 * PI / 180, PITCH_MIN: -10 * PI / 180, PITCH_MAX: 10 * PI / 180, GUN_Y: 2.04, ARM_DELAY: 5, RESPAWN_DELAY: 2.5, MAX_CARS: 6, FINISH_GRACE: 45,
-  ARENA_TIME: 180, ARENA_KILLS: 10, ARENA_ARM: 3
+  ARENA_TIME: 180, ARENA_KILLS: 10, ARENA_ARM: 0
 };
 const DIFFS = {
   recrue:  { speed: 0.86, acc: 0.35, aggr: 0.55, dmg: 0.7 },
@@ -35,7 +35,7 @@ const PAD_GROUPS = [160, 340, 520, 700, 880, 1060], PAD_LAT = [-6, 0, 6];
 const PAD_ORDER = [['rocket', 'rear', 'repair'], ['rear', 'repair', 'rocket'], ['repair', 'rocket', 'rear']];
 const REAR_KEYS = ['oil', 'mines', 'smoke'], REAR_N = { oil: 2, mines: 3, smoke: 1 }, REAR_CODE = { oil: 1, mines: 2, smoke: 3 };
 // snapshot layout of one car
-const F = { x: 0, z: 1, h: 2, vF: 3, vL: 4, tur: 5, armor: 6, flags: 7, steer: 8, nitro: 9, rockets: 10, rear: 11, rearN: 12, heat: 13, overheat: 14, progress: 15, finishTime: 16, kills: 17, deaths: 18, respawnT: 19, smokeT: 20, invuln: 21, tp: 22, oil: 23, oilSpin: 24, y: 25, vy: 26, shield: 27 };
+const F = { x: 0, z: 1, h: 2, vF: 3, vL: 4, tur: 5, armor: 6, flags: 7, steer: 8, nitro: 9, rockets: 10, rear: 11, rearN: 12, heat: 13, overheat: 14, progress: 15, finishTime: 16, kills: 17, deaths: 18, respawnT: 19, smokeT: 20, invuln: 21, tp: 22, oil: 23, oilSpin: 24, y: 25, vy: 26, shield: 27, shieldT: 28 };
 const FL = { alive: 1, finished: 2, turbo: 4, drifting: 8, oil: 16, air: 32 };
 
 function buildTrack(THREE) {
@@ -898,7 +898,7 @@ function createRace(T, opts) {
         r2(c.x), r2(c.z), r3(c.h), r2(c.vF), r2(c.vL), r3(c.turretYaw), r2(c.armor),
         (c.alive ? FL.alive : 0) | (c.finished ? FL.finished : 0) | (c.turboOn ? FL.turbo : 0) | (c.drifting ? FL.drifting : 0) | (c.oil > 0 ? FL.oil : 0) | (c.air ? FL.air : 0),
         r2(c.steerSm), r2(c.nitro), c.rockets, c.rear ? REAR_CODE[c.rear] : 0, c.rearN, r2(c.heat), r2(c.overheat), Math.round(c.progress),
-        r2(c.finishTime), c.kills, c.deaths, r2(c.respawnT), r2(c.smokeT), r2(c.invuln), r3(c.turretPitch), r2(Math.max(0, c.oil)), r2(c.oilSpin), r2(c.y || 0), r2(c.vy || 0), Math.ceil(c.shield || 0)
+        r2(c.finishTime), c.kills, c.deaths, r2(c.respawnT), r2(c.smokeT), r2(c.invuln), r3(c.turretPitch), r2(Math.max(0, c.oil)), r2(c.oilSpin), r2(c.y || 0), r2(c.vy || 0), Math.ceil(c.shield || 0), r2(Math.max(0, c.shieldT || 0))
       ]),
       r: R.rockets.map(r => [r.id, r2(r.x), r2(r.z), r3(r.h), r2(r.y)]),
       m: R.mines.map(m => [m.id, r2(m.x), r2(m.z), m.arm <= 0 ? 1 : 0, r2(m.y || 0)]),
