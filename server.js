@@ -10,6 +10,8 @@ const PUB = path.join(__dirname, 'public');
 const THREE = require(path.join(PUB, 'three.min.js'));
 const Sim = require(path.join(PUB, 'sim.js'));
 const T = Sim.buildTrack(THREE);
+const A = Sim.buildArena();
+const MODES = ['race', 'arena'];
 const PORT = parseInt(process.argv[2] || process.env.PORT || '3000', 10);
 const MAX_CLIENTS = 16;
 
@@ -51,7 +53,7 @@ server.on('upgrade', (req, socket) => {
   const accept = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
   socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
   socket.setNoDelay(true);
-  const cl = { socket, id: nextPid++, open: true, joined: false, name: '', color: 0, buf: Buffer.alloc(0), input: {}, queue: [], ack: 0, rk: 0, re: 0, wantRocket: false, wantRear: false, spec: false, lateEv: [] };
+  const cl = { socket, id: nextPid++, open: true, joined: false, name: '', color: 0, buf: Buffer.alloc(0), input: {}, queue: [], ack: 0, rk: 0, re: 0, wantRocket: false, wantRear: false, spec: false, lateEv: [], vote: 'race' };
   clients.add(cl);
   socket.on('data', d => { cl.buf = Buffer.concat([cl.buf, d]); parseFrames(cl); });
   socket.on('close', () => drop(cl));
@@ -89,13 +91,23 @@ function drop(cl) {
 }
 
 /* ---------------- Salon & course ---------------- */
+// mode: decided by the host, or by a vote of everyone in the lobby (ties go to the host's vote)
+let decide = 'host', hostMode = 'race', aiFill = true;
 let phase = 'lobby', diff = 'detenu', race = null, results = null, finishDeadline = null, tick = 0, ending = false;
 const players = () => [...clients].filter(c => c.joined).sort((a, b) => a.id - b.id);
 const host = () => players()[0] || null;
 
+function currentMode() {
+  if (decide === 'host') return hostMode;
+  const n = { race: 0, arena: 0 };
+  for (const p of players()) n[p.vote]++;
+  if (n.race !== n.arena) return n.race > n.arena ? 'race' : 'arena';
+  const h = host(); return h ? h.vote : 'race';
+}
 function lobbyState() {
   const h = host();
-  return { t: 'lobby', phase, diff, addrs: lanAddresses().map(ip => 'http://' + ip + ':' + PORT), host: h ? h.id : null, players: players().map(p => ({ id: p.id, name: p.name, color: p.color, spec: p.spec })), results };
+  return { t: 'lobby', phase, diff, addrs: lanAddresses().map(ip => 'http://' + ip + ':' + PORT), host: h ? h.id : null, players: players().map(p => ({ id: p.id, name: p.name, color: p.color, spec: p.spec, vote: p.vote })), results,
+    mode: currentMode(), decide, ai: aiFill ? 'fill' : 'none' };
 }
 function broadcastLobby() { broadcast(lobbyState()); }
 
@@ -118,7 +130,7 @@ function onMessage(cl, txt) {
     console.log('  + ' + name + ' a rejoint la partie');
     send(cl, { t: 'welcome', id: cl.id, name });
     broadcastLobby();
-    if (phase === 'race' && race) send(cl, { t: 'start', cars: race.info(), diff, spectator: true });
+    if (phase === 'race' && race) send(cl, { t: 'start', cars: race.info(), diff, mode: race.mode, spectator: true });
     return;
   }
   if (!cl.joined) return;
@@ -132,6 +144,14 @@ function onMessage(cl, txt) {
     if (cl.queue.length > 8) cl.queue.splice(0, cl.queue.length - 4);
     if (typeof m.rk === 'number' && m.rk > cl.rk) { cl.rk = m.rk; cl.wantRocket = true; }
     if (typeof m.re === 'number' && m.re > cl.re) { cl.re = m.re; cl.wantRear = true; }
+  } else if (m.t === 'mode' && phase !== 'race' && MODES.includes(m.m)) {
+    cl.vote = m.m;
+    if (isHost) hostMode = m.m;
+    broadcastLobby();
+  } else if (m.t === 'decide' && isHost && phase !== 'race' && (m.d === 'host' || m.d === 'vote')) {
+    decide = m.d; broadcastLobby();
+  } else if (m.t === 'ai' && isHost && phase !== 'race') {
+    aiFill = !!m.on; broadcastLobby();
   } else if (m.t === 'diff' && isHost && phase === 'lobby' && Sim.DIFFS[m.d]) {
     diff = m.d; broadcastLobby();
   } else if (m.t === 'start' && isHost && phase === 'lobby') {
@@ -148,19 +168,21 @@ function onMessage(cl, txt) {
 function startRace() {
   const racers = players().filter(p => !p.spec).slice(0, Sim.C.MAX_CARS);
   if (!racers.length) { send(host(), { t: 'notice', txt: 'Il faut au moins un pilote pour lancer la course.' }); return; }
-  race = Sim.createRace(T, { humans: racers.map(p => ({ id: p.id, name: p.name, color: p.color })), diff });
+  const mode = currentMode();
+  race = Sim.createRace(mode === 'arena' ? A : T, { humans: racers.map(p => ({ id: p.id, name: p.name, color: p.color })), diff, ai: aiFill ? Sim.C.MAX_CARS : 0 });
   for (const p of players()) { p.input = {}; p.queue = []; p.ack = 0; p.wantRocket = p.wantRear = false; }
   phase = 'race'; finishDeadline = null; results = null; ending = false;
   broadcastLobby();
-  for (const p of players()) send(p, { t: 'start', cars: race.info(), diff, spectator: !racers.includes(p) });
-  console.log('  > Départ ! ' + racers.length + ' joueur(s) + ' + (Sim.C.MAX_CARS - racers.length) + ' IA, difficulté ' + diff);
+  for (const p of players()) send(p, { t: 'start', cars: race.info(), diff, mode, spectator: !racers.includes(p) });
+  console.log('  > Départ (' + (mode === 'arena' ? 'arène' : 'course') + ') ! ' + racers.length + ' joueur(s) + ' + (race.cars.length - racers.length) + ' IA, difficulté ' + diff);
 }
 function endRace() {
   results = race.results();
+  const md = race.mode;
   phase = 'results'; race = null;
-  broadcast({ t: 'results', rows: results });
+  broadcast({ t: 'results', rows: results, mode: md });
   broadcastLobby();
-  console.log('  < Course terminée. Vainqueur : ' + results[0].name);
+  console.log('  < ' + (md === 'arena' ? 'Match' : 'Course') + ' terminé' + (md === 'arena' ? '' : 'e') + '. Vainqueur : ' + results[0].name);
 }
 
 // Fixed 60 Hz simulation. Timers are coarse on Windows (~16 ms), so we poll often,
@@ -231,6 +253,10 @@ function checkEnd() {
   const humans = race.cars.filter(c => c.human);
   if (!humans.length) { endRace(); return true; }
   if (ending) return false;
+  if (race.mode === 'arena') {
+    if (race.over) { ending = true; setTimeout(() => { if (race && phase === 'race') endRace(); }, 2500); }
+    return false;
+  }
   if (humans.every(c => c.finished)) {
     ending = true; setTimeout(() => { if (race && phase === 'race') endRace(); }, 1500);
     return false;

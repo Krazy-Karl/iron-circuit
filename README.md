@@ -2,9 +2,14 @@
 
 Course de combat en 3D façon *Death Race*, jouable directement dans le navigateur :
 voitures blindées, tourelle à la souris, roquettes, pièges (huile, mines, fumée) et
-plaques au sol, sur un circuit de pénitencier de nuit.
+plaques au sol. Deux modes :
 
-- **Solo** contre 5 pilotes IA : ouvre `solo/iron-circuit.html` dans un navigateur
+- **Course** : 3 tours d'un circuit de pénitencier de nuit, le premier sous le drapeau gagne.
+- **Arène** : 3 minutes de match à mort chacun pour soi dans une cour à reliefs (pont
+  central sur rampes, tunnel en dessous, tremplins, tonneaux explosifs). Le premier à
+  10 destructions gagne, sinon le meilleur score à la fin du temps.
+
+- **Solo** contre 5 pilotes IA, ou seul pour s'entraîner : ouvre `solo/iron-circuit.html` dans un navigateur
   (connexion Internet nécessaire pour charger le moteur 3D).
 - **Réseau local (LAN)** jusqu'à 6 pilotes + IA : un PC lance le serveur Node.js,
   les autres jouent dans leur navigateur. Le guide complet est ci-dessous.
@@ -84,9 +89,16 @@ jouer et héberger en même temps peut le ralentir. Deux possibilités :
 - ou l'ouvrir et cocher **« Je regarde seulement »** dans le salon : il peut alors lancer
   les courses et suivre la partie en spectateur, en changeant de voiture avec ← →.
 
-Le **premier joueur arrivé est l'hôte**. C'est lui qui choisit la difficulté de
-l'IA et clique sur **Lancer la course**. À la fin de la course, il ramène tout le
-monde au salon avec **Retour au salon**.
+Le **premier joueur arrivé est l'hôte**. Dans le salon, il règle :
+- le **mode de jeu** (Course ou Arène), et **qui le choisit** : lui seul, ou **un vote**
+  de tout le salon (chacun clique sur le mode qu'il veut ; en cas d'égalité, le vote de
+  l'hôte l'emporte) ;
+- les **pilotes IA** : compléter la grille jusqu'à 6 voitures, ou **aucun** (uniquement
+  les joueurs humains) ;
+- le **niveau des IA**.
+
+Il lance ensuite la partie. À la fin, il ramène tout le monde au salon avec **Retour au salon**.
+Le décor du mode choisi s'affiche en fond du salon.
 
 ## 4. Pendant la course
 
@@ -97,6 +109,18 @@ monde au salon avec **Retour au salon**.
 - La course se termine quand tous les joueurs ont passé la ligne. Quand le premier
   joueur arrive, les autres ont **45 secondes** pour finir, sinon ils sont « non classés ».
 - Si un joueur quitte la partie, l'IA prend le volant de sa voiture.
+
+**En mode Arène**
+- Match de **3 minutes**, chacun pour soi. Le premier à **10 destructions** gagne ; sinon,
+  le meilleur score à la fin du temps (à égalité, celui qui a été le moins détruit).
+- Les armes s'activent après **3 secondes**. Les voitures détruites réapparaissent au
+  point de départ le plus éloigné des adversaires.
+- Le terrain a du relief : monte sur le **pont central** par les rampes (des roquettes
+  t'y attendent), passe par le **tunnel** dessous, saute sur les **tremplins** jaunes.
+  On peut tomber du pont, et une chute trop violente abîme la voiture.
+- La tourelle vise aussi en hauteur (±10°) : utile pour tirer depuis le pont ou vers lui.
+- Les **tonneaux rouges** explosent quand on leur tire dessus (et les explosions se
+  propagent). Ils réapparaissent 20 secondes plus tard.
 
 ### Commandes
 
