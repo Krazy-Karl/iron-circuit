@@ -6,8 +6,8 @@ plaques au sol. Deux modes :
 
 - **Course** : 3 tours d'un circuit de pénitencier de nuit, le premier sous le drapeau gagne.
 - **Arène** : 3 minutes de match à mort chacun pour soi dans une grande cour à reliefs
-  (deux plateformes d'angle aux grilles brûlantes, colline centrale avec un bouclier,
-  dos-d'âne, tremplins, tonneaux explosifs). Le premier à 10 destructions gagne, sinon
+  (deux plateformes d'angle aux grilles brûlantes, bunkers à tunnels en L, colline
+  centrale avec un bouclier, dos-d'âne, tremplins, tonneaux explosifs). Le premier à 10 destructions gagne, sinon
   le meilleur score à la fin du temps.
 
 - **Solo** contre 5 pilotes IA, ou seul pour s'entraîner : ouvre `solo/iron-circuit.html` dans un navigateur
@@ -124,6 +124,10 @@ Le décor du mode choisi s'affiche en fond du salon.
     descend que de 10°) : les blocs bas qui s'y trouvent servent d'approche à couvert ;
   - une **colline centrale** accessible par les quatre côtés, avec le **bouclier** au sommet,
     à découvert ;
+  - deux **bunkers** traversés par un **tunnel en L** : on entre d'un côté et on ressort
+    d'un autre après un virage, sans longue ligne de tir. Une plaque de **réparation**
+    attend au coude de chaque tunnel ;
+  - un **tunnel court** (20 m) passe aussi sous chaque plateforme, à côté de sa rampe ;
   - des **dos-d'âne** qui font décoller si on les prend vite, et deux **tremplins** jaunes.
 - **Bouclier** (plaque bleue) : +50 points qui encaissent les dégâts avant le blindage,
   pendant 15 s au maximum (bulle bleue autour de la voiture, barre bleue dans le HUD).

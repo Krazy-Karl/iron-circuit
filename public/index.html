@@ -639,6 +639,7 @@ let barrelIM = null;
   // solids: deck, slab, ramps, jump ramps, cover; ramps are boxes whose top follows the slope
   const deckMat = stdMat({ color: 0x3d434c, roughness: 0.6, metalness: 0.5 }), rampMat = stdMat({ color: 0x5b6169, roughness: 0.55, metalness: 0.5 });
   const kickMat = stdMat({ color: 0xc89a2c, roughness: 0.6, metalness: 0.3 });
+  const bunkerMat = stdMat({ map: concreteTex, color: 0x8c877d, roughness: 0.95 });
   const coverCols = [0x7a2e22, 0x24505c, 0x4d4f52, 0x2f4a33], coverMats = coverCols.map(c => stdMat({ color: c, roughness: 0.75, metalness: 0.4 }));
   const topOf = (sd, x, z) => { if (!sd.ax) return sd.h1; const t = clamp(((sd.ax === 'z' ? z : x) - sd.a0) / (sd.a1 - sd.a0), 0, 1); return sd.h0 + (sd.h1 - sd.h0) * t; };
   AR.solids.forEach((sd, k) => {
@@ -651,15 +652,34 @@ let barrelIM = null;
     g.computeVertexNormals();
     const top = Math.max(sd.h0, sd.h1);
     const big = (sd.x1 - sd.x0) * (sd.z1 - sd.z0) > 100;
-    const mat = sd.ax ? (top < 2 ? kickMat : rampMat) : big ? deckMat : coverMats[k % coverMats.length];
+    const mat = sd.ax ? (top < 2 ? kickMat : rampMat) : sd.k === 'bunker' ? bunkerMat : sd.k === 'deck' || big ? deckMat : coverMats[k % coverMats.length];
     add(new THREE.Mesh(g, mat));
   });
   // yellow-and-black edges around platform and hill tops
   const edgeMat = new THREE.MeshBasicMaterial({ map: stripeTex });
   for (const sd of AR.solids) {
-    if (sd.ax || (sd.x1 - sd.x0) * (sd.z1 - sd.z0) <= 100) continue;
+    if (sd.ax || sd.k === 'bunker' || sd.b > 0 || ((sd.x1 - sd.x0) * (sd.z1 - sd.z0) <= 100 && sd.k !== 'deck')) continue;
     const y = sd.h1 + 0.03, w = sd.x1 - sd.x0, d = sd.z1 - sd.z0, cx = (sd.x0 + sd.x1) / 2, cz = (sd.z0 + sd.z1) / 2;
     for (const [bw, bd, x, z] of [[w, 0.5, cx, sd.z0 + 0.25], [w, 0.5, cx, sd.z1 - 0.25], [0.5, d, sd.x0 + 0.25, cz], [0.5, d, sd.x1 - 0.25, cz]]) add(new THREE.Mesh(new THREE.BoxGeometry(bw, 0.06, bd), edgeMat)).position.set(x, y, z);
+  }
+  // tunnels: lamps under every slab and a hazard frame around each mouth
+  const lampMat = new THREE.MeshBasicMaterial({ color: 0xffc46a });
+  for (const sd of AR.solids) {
+    if (!(sd.b > 0)) continue;
+    const alongX = sd.x1 - sd.x0 > sd.z1 - sd.z0, cx = (sd.x0 + sd.x1) / 2, cz = (sd.z0 + sd.z1) / 2;
+    const len = alongX ? sd.x1 - sd.x0 : sd.z1 - sd.z0;
+    for (let t = 3; t < len; t += 6) add(new THREE.Mesh(new THREE.BoxGeometry(alongX ? 1.4 : 0.4, 0.1, alongX ? 0.4 : 1.4), lampMat)).position.set(alongX ? sd.x0 + t : cx, sd.b - 0.06, alongX ? cz : sd.z0 + t);
+    for (const f of sd.mouths || []) {
+      if (f[0] === 'x') {
+        const x = f === 'x0' ? sd.x0 - 0.15 : sd.x1 + 0.15;
+        for (const z of [sd.z0 + 0.2, sd.z1 - 0.2]) add(new THREE.Mesh(new THREE.BoxGeometry(0.3, sd.b, 0.4), edgeMat)).position.set(x, sd.b / 2, z);
+        add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.5, sd.z1 - sd.z0), edgeMat)).position.set(x, sd.b - 0.25, cz);
+      } else {
+        const z = f === 'z0' ? sd.z0 - 0.15 : sd.z1 + 0.15;
+        for (const x of [sd.x0 + 0.2, sd.x1 - 0.2]) add(new THREE.Mesh(new THREE.BoxGeometry(0.4, sd.b, 0.3), edgeMat)).position.set(x, sd.b / 2, z);
+        add(new THREE.Mesh(new THREE.BoxGeometry(sd.x1 - sd.x0, 0.5, 0.3), edgeMat)).position.set(cx, sd.b - 0.25, z);
+      }
+    }
   }
   // burning vents: steel grates on the platform tops, plus a glow that warns then burns
   const grateTex = (() => {
@@ -1673,7 +1693,7 @@ function drawArenaMap() {
   mg.strokeStyle = '#5b616b'; mg.lineWidth = 3; mg.strokeRect(M.X(AR.W), M.Y(AR.D), AR.W * 2 * M.s, AR.D * 2 * M.s);
   for (const sd of AR.solids) {
     const top = Math.max(sd.h0, sd.h1);
-    mg.fillStyle = sd.ax ? (top < 2 ? '#8a6a28' : '#59606b') : (sd.x1 - sd.x0) * (sd.z1 - sd.z0) > 100 ? '#4b515b' : '#3a3f48';
+    mg.fillStyle = sd.b > 0 ? 'rgba(120,126,136,.35)' : sd.ax ? (top < 2 ? '#8a6a28' : '#59606b') : sd.k === 'bunker' ? '#5d5a54' : sd.k === 'deck' || (sd.x1 - sd.x0) * (sd.z1 - sd.z0) > 100 ? '#4b515b' : '#3a3f48';
     mg.fillRect(M.X(sd.x1), M.Y(sd.z1), (sd.x1 - sd.x0) * M.s, (sd.z1 - sd.z0) * M.s);
   }
   if (curSnap && curSnap.vt) { mg.fillStyle = curSnap.vt === 2 ? 'rgba(255,90,26,.55)' : 'rgba(255,90,26,.25)'; for (const v of AR.vents) mg.fillRect(M.X(v.x1), M.Y(v.z1), (v.x1 - v.x0) * M.s, (v.z1 - v.z0) * M.s); }

@@ -78,15 +78,31 @@ function buildTrack(THREE) {
 /* ---------- Arena: a yard with a deck on ramps, a tunnel under it, jump ramps, cover and barrels ----------
    Everything solid is a box footprint with a bottom and a top; the top can slope (ramps).
    A car can drive onto any top that is at most 0.9 above it; anything higher is a wall. */
-const P = 3.2;   // platform height
+const P = 3.6, TB = 3.0;   // platform height, tunnel ceiling
 const ARENA = {
   W: 95, D: 70, WALL_H: 3,
   solids: [
     // two corner platforms, each with two ramps on different sides
-    { x0: 30, x1: 54, z0: 22, z1: 42, b: 0, h0: P, h1: P },
+    // (a short straight tunnel runs under each platform, beside its south/north ramp)
+    { x0: 30, x1: 46, z0: 22, z1: 42, b: 0, h0: P, h1: P, k: 'deck' },
+    { x0: 46, x1: 53, z0: 22, z1: 42, b: TB, h0: P, h1: P, k: 'deck', mouths: ['z0', 'z1'] },
+    { x0: 53, x1: 54, z0: 22, z1: 42, b: 0, h0: P, h1: P, k: 'deck' },
     { x0: 14, x1: 30, z0: 28, z1: 36, b: 0, ax: 'x', a0: 30, a1: 14, h0: P, h1: 0 },
     { x0: 38, x1: 46, z0: 8, z1: 22, b: 0, ax: 'z', a0: 22, a1: 8, h0: P, h1: 0 },
-    { x0: -54, x1: -30, z0: -42, z1: -22, b: 0, h0: P, h1: P },
+    { x0: -46, x1: -30, z0: -42, z1: -22, b: 0, h0: P, h1: P, k: 'deck' },
+    { x0: -53, x1: -46, z0: -42, z1: -22, b: TB, h0: P, h1: P, k: 'deck', mouths: ['z0', 'z1'] },
+    { x0: -54, x1: -53, z0: -42, z1: -22, b: 0, h0: P, h1: P, k: 'deck' },
+    // two bunkers with an L-shaped tunnel: enter on one side, turn, leave on another
+    { x0: -54, x1: -30, z0: 22, z1: 26, b: 0, h0: P, h1: P, k: 'bunker' },
+    { x0: -54, x1: -50, z0: 26, z1: 42, b: 0, h0: P, h1: P, k: 'bunker' },
+    { x0: -42, x1: -30, z0: 34, z1: 42, b: 0, h0: P, h1: P, k: 'bunker' },
+    { x0: -42, x1: -30, z0: 26, z1: 34, b: TB, h0: P, h1: P, k: 'bunker', mouths: ['x1'] },
+    { x0: -50, x1: -42, z0: 26, z1: 42, b: TB, h0: P, h1: P, k: 'bunker', mouths: ['z1'] },
+    { x0: 30, x1: 54, z0: -26, z1: -22, b: 0, h0: P, h1: P, k: 'bunker' },
+    { x0: 50, x1: 54, z0: -42, z1: -26, b: 0, h0: P, h1: P, k: 'bunker' },
+    { x0: 30, x1: 42, z0: -42, z1: -34, b: 0, h0: P, h1: P, k: 'bunker' },
+    { x0: 30, x1: 42, z0: -34, z1: -26, b: TB, h0: P, h1: P, k: 'bunker', mouths: ['x0'] },
+    { x0: 42, x1: 50, z0: -42, z1: -26, b: TB, h0: P, h1: P, k: 'bunker', mouths: ['z0'] },
     { x0: -30, x1: -14, z0: -36, z1: -28, b: 0, ax: 'x', a0: -30, a1: -14, h0: P, h1: 0 },
     { x0: -46, x1: -38, z0: -22, z1: -8, b: 0, ax: 'z', a0: -22, a1: -8, h0: P, h1: 0 },
     // central hill, reachable from all four sides (the shield waits on top)
@@ -106,7 +122,7 @@ const ARENA = {
     // low cover, mostly in the blind zone at the foot of the platforms
     { x0: 14, x1: 26, z0: 50.5, z1: 53.5, b: 0, h0: 2.4, h1: 2.4 }, { x0: -26, x1: -14, z0: -53.5, z1: -50.5, b: 0, h0: 2.4, h1: 2.4 },
     { x0: 60.5, x1: 63.5, z0: -28, z1: -16, b: 0, h0: 2.4, h1: 2.4 }, { x0: -63.5, x1: -60.5, z0: 16, z1: 28, b: 0, h0: 2.4, h1: 2.4 },
-    { x0: -32, x1: -24, z0: 20.5, z1: 23.5, b: 0, h0: 2.4, h1: 2.4 }, { x0: 24, x1: 32, z0: -23.5, z1: -20.5, b: 0, h0: 2.4, h1: 2.4 },
+    { x0: -28, x1: -20, z0: 16, z1: 19, b: 0, h0: 2.4, h1: 2.4 }, { x0: 20, x1: 28, z0: -19, z1: -16, b: 0, h0: 2.4, h1: 2.4 },
     { x0: 57, x1: 59.5, z0: 27, z1: 37, b: 0, h0: 2.4, h1: 2.4 }, { x0: -59.5, x1: -57, z0: -37, z1: -27, b: 0, h0: 2.4, h1: 2.4 },
     { x0: -77, x1: -67, z0: -53.5, z1: -50.5, b: 0, h0: 2.4, h1: 2.4 }, { x0: 67, x1: 77, z0: 50.5, z1: 53.5, b: 0, h0: 2.4, h1: 2.4 },
     { x0: -5, x1: 5, z0: 29, z1: 31.5, b: 0, h0: 2.4, h1: 2.4 }, { x0: -5, x1: 5, z0: -31.5, z1: -29, b: 0, h0: 2.4, h1: 2.4 }
@@ -118,7 +134,7 @@ const ARENA = {
   pads: [
     { type: 'shield', x: 0, z: 0, y: 2 },
     { type: 'rocket', x: 48, z: 38, y: P }, { type: 'rocket', x: -48, z: -38, y: P }, { type: 'rocket', x: 84, z: 0, y: 0 }, { type: 'rocket', x: -84, z: 0, y: 0 },
-    { type: 'repair', x: -40, z: 40, y: 0 }, { type: 'repair', x: 40, z: -40, y: 0 },
+    { type: 'repair', x: -46, z: 30, y: 0 }, { type: 'repair', x: 46, z: -30, y: 0 },
     { type: 'rear', x: 0, z: 62, y: 0 }, { type: 'rear', x: 0, z: -62, y: 0 }, { type: 'rear', x: -45, z: 0, y: 0 }, { type: 'rear', x: 45, z: 0, y: 0 }
   ],
   spawns: [[-85, -60], [85, 60], [-85, 60], [85, -60], [-30, -62], [30, 62], [30, -62], [-30, 62]],
@@ -129,7 +145,11 @@ const ARENA = {
     { pts: [[26, 0], [10, 0], [0, 0], [-10, 0], [-26, 0]] }, { pts: [[-26, 0], [-10, 0], [0, 0], [10, 0], [26, 0]] },
     { pts: [[0, 24], [0, 10], [0, 0], [0, -10], [0, -24]] }, { pts: [[0, -24], [0, -10], [0, 0], [0, 10], [0, 24]] },
     { pts: [[50, 0], [82, 0]] }, { pts: [[-50, 0], [-82, 0]] }, { pts: [[0, 38], [0, 64]] }, { pts: [[0, -38], [0, -64]] },
-    { pts: [[-78, 12], [-78, 40], [-78, 56]] }, { pts: [[78, -12], [78, -40], [78, -56]] }
+    { pts: [[-78, 12], [-78, 40], [-78, 56]] }, { pts: [[78, -12], [78, -40], [78, -56]] },
+    { pts: [[-20, 30], [-38, 30], [-46, 30], [-46, 42], [-46, 52]] }, { pts: [[-46, 52], [-46, 42], [-46, 30], [-38, 30], [-20, 30]] },
+    { pts: [[20, -30], [38, -30], [46, -30], [46, -42], [46, -52]] }, { pts: [[46, -52], [46, -42], [46, -30], [38, -30], [20, -30]] },
+    { pts: [[49.5, 12], [49.5, 32], [49.5, 52]] }, { pts: [[49.5, 52], [49.5, 32], [49.5, 12]] },
+    { pts: [[-49.5, -12], [-49.5, -32], [-49.5, -52]] }, { pts: [[-49.5, -52], [-49.5, -32], [-49.5, -12]] }
   ],
   exits: [[[6, 32], [42, 2]], [[-6, -32], [-42, -2]]]
 };
