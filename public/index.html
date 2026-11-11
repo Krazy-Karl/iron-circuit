@@ -405,6 +405,13 @@ body.ink #gunMark{border-color:#111;box-shadow:0 0 0 1px var(--sodium)}
 <script src="three.min.js"></script>
 <script src="sim.js"></script>
 <script>
+// if the game script fails to start, say why in the menu instead of hanging on "Connexion au serveur…"
+addEventListener('error', e => {
+  const n = document.getElementById('joinNote');
+  if (n && !window.IRON_STARTED) { n.textContent = 'Erreur au démarrage : ' + (e.message || e) + (e.lineno ? ' (ligne ' + e.lineno + ')' : '') + '. Envoie une capture de ce message.'; n.style.color = '#e0402f'; }
+});
+</script>
+<script>
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
@@ -2478,6 +2485,7 @@ function frame(now) {
   perfFrame(rawMs, tB - tA, tC - tB, performance.now() - tC);
 }
 requestAnimationFrame(t => { last = t; frame(t); });
+window.IRON_STARTED = true;
 if (SOLO) initSolo(); else connect();
 })();
 </script>
