@@ -61,6 +61,7 @@ body.racing #game{cursor:none}
 .hud-br{bottom:calc(18px + env(safe-area-inset-bottom,0px));right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:10px;justify-items:end}
 .speed{font-family:var(--f-display);font-size:68px;line-height:.85}
 .speed small{font-family:var(--f-ui);font-size:15px;letter-spacing:.14em;color:var(--dim);margin-left:6px}
+#hGear{display:inline-block;min-width:1.6em;padding:2px 5px;border:1px solid var(--line);color:var(--bone);text-align:center;letter-spacing:0}
 .slots{display:flex;gap:8px}
 .slot{display:grid;grid-template-columns:auto auto;column-gap:10px;align-items:center;background:rgba(8,9,12,.6);border:1px solid var(--line);padding:6px 10px;min-width:120px}
 .slot .key{grid-row:span 2;font-size:12px;font-weight:700;letter-spacing:.06em;border:1px solid var(--line);border-bottom-width:3px;padding:2px 6px;color:var(--bone);background:var(--plate-2)}
@@ -214,7 +215,7 @@ body.ink #gunMark{border-color:#111;box-shadow:0 0 0 1px var(--sodium)}
       <div class="gauge"><span class="lbl">TURBO</span><div class="bar nitro"><i id="hNitro" style="width:100%"></i></div><b id="hNitroN">100</b></div>
     </div>
     <div class="hud hud-br">
-      <div class="speed"><span id="hSpeed">0</span><small>KM/H</small></div>
+      <div class="speed"><span id="hSpeed">0</span><small>KM/H</small><small id="hGear">1</small></div>
       <div class="slots">
         <div class="slot" id="slotRocket"><span class="key">CLIC D</span><span class="lbl">ROQUETTES</span><b id="hRockets">3</b></div>
         <div class="slot empty" id="slotRear"><span class="key">E</span><span class="lbl" id="hRearName">ARME ARRIÈRE</span><b id="hRear">—</b></div>
@@ -618,6 +619,25 @@ trackRoot.add(new THREE.Mesh(ribbon(-(HALF_W + 1), HALF_W + 1, 0.01, 0.01, 10), 
   }
   bar.count = n; trackRoot.add(bar);
 }
+// black speed streaks painted along the track: passing them is what tells the eye how fast you go
+{
+  const pos = [], L = N;
+  const rs = S.mulberry(77), rr = (a, b) => a + rs() * (b - a);
+  for (let n = 0; n < 650; n++) {
+    const k0 = Math.floor(rs() * L), len = Math.max(3, Math.round(rr(5, 18) / SEG)), off = rr(-(HALF_W - 0.9), HALF_W - 0.9), w0 = rr(0.07, 0.2);
+    let prev = null;
+    for (let j = 0; j <= len; j++) {
+      const k = (k0 + j) % L, w = w0 * Math.sin(PI * j / len) + 0.01;
+      const cx = PX[k] + NX[k] * off, cz = PZ[k] + NZ[k] * off;
+      const cur = [cx + NX[k] * w, cz + NZ[k] * w, cx - NX[k] * w, cz - NZ[k] * w];
+      if (prev) pos.push(prev[0], 0.025, prev[1], prev[2], 0.025, prev[3], cur[0], 0.025, cur[1], cur[0], 0.025, cur[1], prev[2], 0.025, prev[3], cur[2], 0.025, cur[3]);
+      prev = cur;
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  const streaks = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  streaks.matrixAutoUpdate = false; trackRoot.add(streaks);
+}
 // static scenery of each map is merged into a handful of draw calls
 mergeScenery(trackRoot.children.filter(o => o.isMesh || (o.isGroup && o.children.length)), trackRoot);
 
@@ -853,6 +873,7 @@ function explosion(x, z, big = 1, y = 0) {
 }
 
 /* ================= Audio ================= */
+const GEARS = [0.2, 0.37, 0.55, 0.76, 1.3];   // top of each gear, as a share of the car's top speed
 const sfx = (() => {
   let ctx = null, master = null, noiseBuf = null, eng = null, muted = store.get('ironcircuit.muted') === '1', budget = 0;
   function init() {
@@ -862,10 +883,16 @@ const sfx = (() => {
       master = ctx.createGain(); master.gain.value = muted ? 0 : 0.5; master.connect(ctx.destination);
       noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
       const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-      o1.type = 'sawtooth'; o2.type = 'square'; f.type = 'lowpass'; f.frequency.value = 500; g.gain.value = 0;
-      o1.connect(f); o2.connect(f); f.connect(g); g.connect(master); o1.start(); o2.start();
-      eng = { o1, o2, f, g };
+      // engine: saw at the firing frequency, square an octave down, sine sub; a slow pulse on the
+      // volume gives the idle its lumpy rumble
+      const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), o3 = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      const am = ctx.createGain(), lfo = ctx.createOscillator(), lfoG = ctx.createGain();
+      o1.type = 'sawtooth'; o2.type = 'square'; o3.type = 'sine'; f.type = 'lowpass'; f.frequency.value = 500; f.Q.value = 2.5; g.gain.value = 0;
+      const o2g = ctx.createGain(); o2g.gain.value = 0.55; const o3g = ctx.createGain(); o3g.gain.value = 0.9;
+      lfo.type = 'sine'; lfoG.gain.value = 0.3; am.gain.value = 0.7; lfo.connect(lfoG); lfoG.connect(am.gain);
+      o1.connect(f); o2.connect(o2g); o2g.connect(f); o3.connect(o3g); o3g.connect(am); f.connect(am); am.connect(g); g.connect(master);
+      for (const o of [o1, o2, o3, lfo]) o.start();
+      eng = { o1, o2, o3, f, g, lfo, lfoG, rpm: 900, gear: 1, shift: 0, last: ctx.currentTime };
     } catch (e) { ctx = null; }
   }
   const vol = (x, z, range) => clamp(1 - Math.hypot(listener.x - x, listener.z - z) / range, 0, 1);
@@ -887,12 +914,26 @@ const sfx = (() => {
   return {
     init, frame() { budget = 4; },
     toggleMute() { muted = !muted; store.set('ironcircuit.muted', muted ? '1' : '0'); if (master) master.gain.value = muted ? 0 : 0.5; return muted; },
-    engine(speed, turbo, on) {
+    // A 5-speed gearbox on top of the car's speed: the revs climb in each gear, drop on the
+    // upshift (with a short cut, a clunk and an exhaust pop) and blip on the downshift.
+    gear: () => eng ? eng.gear : 1,
+    engine(speed, turbo, on, thr = 0, vmax = 40) {
       if (!eng) return;
-      const t = ctx.currentTime, f = 42 + Math.abs(speed) * 3.4 + (turbo ? 25 : 0);
-      eng.o1.frequency.setTargetAtTime(f, t, 0.05); eng.o2.frequency.setTargetAtTime(f * 0.5, t, 0.05);
-      eng.f.frequency.setTargetAtTime(380 + Math.abs(speed) * 26 + (turbo ? 600 : 0), t, 0.08);
-      eng.g.gain.setTargetAtTime(on ? 0.055 : 0, t, 0.15);
+      const t = ctx.currentTime, dt = Math.min(0.1, t - eng.last); eng.last = t;
+      const u = Math.abs(speed) / vmax, rev = speed < -0.5;
+      if (!rev) {
+        if (eng.gear < 5 && u > GEARS[eng.gear - 1]) { eng.gear++; eng.shift = 0.13; if (on) { noise(0.07, 900, 200, 0.1, 'lowpass'); noise(0.05, 2600, 900, 0.06, 'bandpass', 2); } }
+        else if (eng.gear > 1 && u < GEARS[eng.gear - 2] * 0.8) { eng.gear--; if (on && thr) noise(0.05, 2200, 700, 0.05, 'bandpass', 2); }
+      } else eng.gear = 1;
+      const top = rev ? 0.3 : GEARS[eng.gear - 1];
+      const target = !on ? 0 : 900 + 6600 * Math.pow(clamp(u / top, 0, 1), 0.85) * (thr ? 1 : 0.88) + (turbo ? 400 : 0);
+      eng.rpm += (target - eng.rpm) * Math.min(1, dt * (eng.shift > 0 ? 25 : 9));
+      eng.shift = Math.max(0, eng.shift - dt);
+      const fire = eng.rpm / 60 * 3;
+      eng.o1.frequency.setTargetAtTime(fire, t, 0.02); eng.o2.frequency.setTargetAtTime(fire * 0.5, t, 0.02); eng.o3.frequency.setTargetAtTime(fire * 0.25, t, 0.02);
+      eng.lfo.frequency.setTargetAtTime(fire / 8, t, 0.05); eng.lfoG.gain.setTargetAtTime(eng.rpm < 1500 ? 0.3 : 0.08, t, 0.1);
+      eng.f.frequency.setTargetAtTime(220 + eng.rpm * 0.2 + thr * 650 + (turbo ? 500 : 0), t, 0.04);
+      eng.g.gain.setTargetAtTime(on ? (0.035 + 0.04 * thr) * (eng.shift > 0 ? 0.3 : 1) : 0, t, eng.shift > 0 ? 0.015 : 0.08);
     },
     mg(x, z, mine, kind) {
       if (budget-- <= 0) return; const v = mine ? 1 : vol(x, z, 70) * 0.7;
@@ -1552,6 +1593,36 @@ $('pauseTitle').textContent = SOLO ? 'PAUSE' : 'MENU';
 $('pauseEyebrow').textContent = SOLO ? 'Course suspendue' : 'La course continue pendant que ce menu est ouvert';
 $('quitBtn').textContent = SOLO ? 'Abandonner' : 'Quitter la partie';
 
+/* ================= Wind streaks ================= */
+// Thin lines hanging in the air around the player's car; they stretch with speed and fly past.
+const wind = (() => {
+  const n = 40, pos = new Float32Array(n * 6), pts = [];
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false });
+  const lines = new THREE.LineSegments(geo, mat); lines.frustumCulled = false; scene.add(lines);
+  for (let i = 0; i < n; i++) pts.push({ x: 0, y: 0, z: 0, live: false });
+  const place = (q, p, fx, fz, ahead) => {
+    const side = rnd(-1, 1), f = ahead ? rnd(25, 60) : rnd(-5, 60), lat = Math.sign(side) * (3 + Math.abs(side) * 8);
+    q.x = p.x + fx * f - fz * lat; q.z = p.z + fz * f + fx * lat; q.y = (p.y || 0) + rnd(0.3, 3.5); q.live = true;
+  };
+  return function update(dt) {
+    const p = mode === 'race' && myCar && myCar.st;
+    const sp = p && p.alive ? clamp((Math.abs(p.vF) - 14) / 26, 0, 1) : 0;
+    mat.opacity = reduceMotion ? 0 : sp * sp * (ink.on ? 1 : 0.35);
+    lines.visible = mat.opacity > 0.01;
+    if (!lines.visible) { for (const q of pts) q.live = false; return; }
+    const fx = Math.sin(p.h), fz = Math.cos(p.h), len = Math.abs(p.vF) * (p.turbo ? 0.06 : 0.04);
+    pts.forEach((q, i) => {
+      const rx = q.x - p.x, rz = q.z - p.z, along = rx * fx + rz * fz;
+      if (!q.live || along < -8 || along > 90 || Math.abs(rx * fz - rz * fx) > 20) place(q, p, fx, fz, q.live);
+      const o = i * 6;
+      pos[o] = q.x; pos[o + 1] = q.y; pos[o + 2] = q.z;
+      pos[o + 3] = q.x - fx * len; pos[o + 4] = q.y; pos[o + 5] = q.z - fz * len;
+    });
+    geo.attributes.position.needsUpdate = true;
+  };
+})();
+
 /* ================= Ink style ================= */
 // Manga look: the scene is rendered to a texture, then one full-screen pass turns it into
 // paper and ink (flat tones, halftone dots, outlines from depth, speed lines).
@@ -1582,7 +1653,7 @@ const INK_FS = [
   '    vec2 q = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0);',
   '    float r = length(q), a = atan(q.y, q.x) / 6.2831853 + 0.5, bins = 150.0;',
   '    float id = floor(a * bins), h = hash(id * 1.37 + floor(uTime * 10.0));',
-  '    float on = step(1.0 - uSpeed * 0.45, h);',
+  '    float on = step(1.0 - uSpeed * 0.38, h);',
   '    float start = 0.3 + hash(id + 7.1) * 0.3;',
   '    float taper = smoothstep(start, start + 0.35, r);',
   '    float thin = 1.0 - smoothstep(0.0, 0.5 * taper, abs(fract(a * bins) - 0.5));',
@@ -1682,6 +1753,28 @@ const ink = (() => {
     renderer.setRenderTarget(null); renderer.render(postScene, postCam);
     renderer.info.autoReset = true;
   }
+  // classic style: only the speed lines, blended over the normal image
+  const linesMat = new THREE.ShaderMaterial({
+    uniforms: uni, vertexShader: INK_VS, transparent: true, depthTest: false, depthWrite: false,
+    fragmentShader: INK_FS.slice(0, INK_FS.indexOf('void main')) + [
+      'void main(){',
+      '  vec2 q = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0);',
+      '  float r = length(q), a = atan(q.y, q.x) / 6.2831853 + 0.5, bins = 150.0;',
+      '  float id = floor(a * bins), h = hash(id * 1.37 + floor(uTime * 10.0));',
+      '  if (h < 1.0 - uSpeed * 0.45) discard;',
+      '  float start = 0.34 + hash(id + 7.1) * 0.3, taper = smoothstep(start, start + 0.35, r);',
+      '  float line = (1.0 - smoothstep(0.0, 0.5 * taper, abs(fract(a * bins) - 0.5))) * taper;',
+      '  if (line < 0.02) discard;',
+      '  gl_FragColor = vec4(1.0, 1.0, 1.0, line * 0.35);',
+      '}'
+    ].join('\n')
+  });
+  const linesScene = new THREE.Scene(), lq = new THREE.Mesh(quad.geometry, linesMat); lq.frustumCulled = false; linesScene.add(lq);
+  st.lines = speed => {
+    if (reduceMotion || speed < 0.01) return;
+    renderer.getDrawingBufferSize(size); uni.uRes.value.copy(size); uni.uTime.value = time; uni.uSpeed.value = speed;
+    renderer.autoClear = false; renderer.render(linesScene, postCam); renderer.autoClear = true;
+  };
   return st;
 })();
 ink.apply(settings.style === 'ink');
@@ -1916,7 +2009,7 @@ function updateGunMark() {
   gunMark.classList.toggle('locked', s.overheat > 0);
   gunMark.classList.toggle('limit', Math.abs(wrapA(aimYaw - s.h)) > C.TURRET_ARC || aimPitch > C.PITCH_MAX || aimPitch < C.PITCH_MIN);
 }
-const H = { pos: $('hPos'), lap: $('hLap'), time: $('hTime'), armor: $('hArmor'), armorN: $('hArmorN'), nitro: $('hNitro'), nitroN: $('hNitroN'), speed: $('hSpeed'), rockets: $('hRockets'), rear: $('hRear'), rearName: $('hRearName'), slotRear: $('slotRear'), cross: $('cross'), heat: $('heatArc'), crossTxt: $('crossTxt'), hit: $('hit'), feed: $('feed'), standings: $('standings') };
+const H = { pos: $('hPos'), lap: $('hLap'), time: $('hTime'), armor: $('hArmor'), armorN: $('hArmorN'), nitro: $('hNitro'), nitroN: $('hNitroN'), speed: $('hSpeed'), gear: $('hGear'), rockets: $('hRockets'), rear: $('hRear'), rearName: $('hRearName'), slotRear: $('slotRear'), cross: $('cross'), heat: $('heatArc'), crossTxt: $('crossTxt'), hit: $('hit'), feed: $('feed'), standings: $('standings') };
 const HEAT_C = 2 * PI * 22;
 let hitFlash = 0, hitMarker = 0, standT = 0, hudT = 0;
 function feed(text, cls) {
@@ -1997,6 +2090,7 @@ function updateHUD(dt) {
   $('hShieldT').style.width = (p.shield > 0 ? p.shieldT / 15 * 100 : 0) + '%';
   H.nitro.style.width = (p.nitro * 100).toFixed(0) + '%'; H.nitroN.textContent = (p.nitro * 100).toFixed(0);
   H.speed.textContent = Math.round(Math.abs(p.vF) * C.KMH);
+  const gr = p.vF < -0.5 ? 'R' : String(sfx.gear()); if (H.gear.textContent !== gr) H.gear.textContent = gr;
   H.rockets.textContent = p.rockets;
   if (p.rear) { H.rearName.textContent = REAR_INFO[p.rear]; H.rear.textContent = '×' + p.rearN; H.slotRear.classList.remove('empty'); }
   else { H.rearName.textContent = 'ARME ARRIÈRE'; H.rear.textContent = '—'; H.slotRear.classList.add('empty'); }
@@ -2059,16 +2153,18 @@ function updateCamera(dt, time) {
     const yaw = lookYaw === null ? p.h : lookYaw;
     const pitch = p.alive ? lookPitch : 0.35, cp = Math.cos(pitch);
     const dx = Math.sin(yaw) * cp, dy = -Math.sin(pitch), dz = Math.cos(yaw) * cp;
-    const Y = p.y || 0, dist = p.alive ? 8.5 : 18, pivY = 3.6 + Y;
+    const sp = clamp(Math.abs(p.vF) / 40, 0, 1.3);
+    const Y = p.y || 0, dist = p.alive ? 8.5 + sp * 1.4 : 18, pivY = 3.6 + Y - sp * 0.35;
     camPos.set(p.x - dx * dist, Math.max(Y + 1.9, pivY - dy * dist), p.z - dz * dist);
     if (MODE === 'arena') camPos.y = Math.min(camPos.y, ceilingAt(p.x, p.z, Y) - 0.4, ceilingAt(camPos.x, camPos.z, Y) - 0.4);
     camera.position.copy(camPos);
     shake *= Math.exp(-6 * dt);
     if (!reduceMotion && shake > 0.01) camera.position.add(tmpV.set(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).multiplyScalar(shake * 0.6));
+    if (!reduceMotion && p.alive && sp > 0.4) { const b = (sp - 0.4) * (p.turbo ? 0.09 : 0.05); camera.position.y += (Math.sin(time * 53) + Math.sin(time * 31.7)) * b; camera.position.x += Math.sin(time * 41.3) * b * 0.6; }
     camLook.set(p.x + dx * 12, pivY + dy * 12, p.z + dz * 12);
     camera.lookAt(camLook);
-    const fov = 68 + (p.turbo ? 8 : 0) + Math.abs(p.vF) * 0.08;
-    camera.fov += (fov - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix();
+    const fov = 64 + sp * 13 + (p.turbo ? 9 : 0);
+    camera.fov += (fov - camera.fov) * Math.min(1, dt * (fov > camera.fov ? 6 : 2.5)); camera.updateProjectionMatrix();
     sodiumLamp.position.set(p.x + Math.sin(p.h) * 6, 13, p.z + Math.cos(p.h) * 6);
     listener.x = p.x; listener.z = p.z;
     return;
@@ -2310,18 +2406,19 @@ function frame(now) {
   partScale.value = renderer.domElement.height / (2 * Math.tan(camera.fov * PI / 360));
   updateVisuals(dt, time);
   updateCamera(dt, time);
+  wind(dt);
   if (mode === 'race') {
     updateAim(); updateGunMark(); updateHUD(dt); updateLock(dt);
     const p = myCar && myCar.st;
-    sfx.engine(p ? p.vF : 0, p && p.turbo, !!(p && p.alive && !p.finished));
+    sfx.engine(p ? p.vF : 0, p && p.turbo, !!(p && p.alive && !p.finished), readInput().th, C.BASE_MAX * (myCar.loadout ? S.CARS[myCar.loadout.car].spd : 1));
   }
   const tC = performance.now();
   gpuPoll();
   const gq = gpuBegin();
-  if (ink.on) {
-    const p = mode === 'race' && myCar && myCar.st;
-    ink.render(p && p.alive ? clamp((Math.abs(p.vF) - 22) / 22, 0, 1) * (p.turbo ? 1 : 0.7) : 0);
-  } else renderer.render(scene, camera);
+  const p = mode === 'race' && myCar && myCar.st;
+  const speedFx = p && p.alive ? clamp((Math.abs(p.vF) - 16) / 24, 0, 1) * (p.turbo ? 1 : 0.75) : 0;
+  if (ink.on) ink.render(speedFx);
+  else { renderer.render(scene, camera); ink.lines(speedFx); }
   gpuEnd(gq);
   perfFrame(rawMs, tB - tA, tC - tB, performance.now() - tC);
 }

@@ -165,6 +165,17 @@ Les IA reçoivent des configurations au hasard.
 
 **Peinture** : 8 couleurs. Deux joueurs peuvent choisir la même couleur.
 
+### Sensation de vitesse
+
+- Le champ de vision s'élargit avec la vitesse (encore plus au turbo), la caméra recule
+  et descend un peu, et elle vibre légèrement à haute vitesse.
+- Des **traits noirs** sont peints sur la piste : on les voit défiler sous la voiture.
+- Des **lignes de vitesse** partent du centre de l'écran, et de fines traînées d'air passent
+  autour de la voiture. Ces effets sont coupés si le système demande de réduire les animations.
+- **Moteur** : boîte à 5 rapports. Le régime monte dans chaque rapport et retombe au passage
+  du suivant (coupure, claquement, petite détonation à l'échappement). Le rapport engagé
+  s'affiche à côté de la vitesse (R en marche arrière).
+
 ### Commandes
 
 | Touche | Action |
