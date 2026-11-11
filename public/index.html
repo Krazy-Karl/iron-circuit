@@ -854,7 +854,7 @@ function explosion(x, z, big = 1, y = 0) {
 }
 
 /* ================= Audio ================= */
-const GEARS = [0.3, 0.52, 0.74, 0.97, 1.4];   // top of each gear, as a share of the car's top speed
+const GEARS = [0.25, 0.45, 0.65, 0.85, 1.45];   // top of each gear, as a share of the car's top speed
 const sfx = (() => {
   let ctx = null, master = null, noiseBuf = null, eng = null, muted = store.get('ironcircuit.muted') === '1', budget = 0;
   function init() {
@@ -869,7 +869,7 @@ const sfx = (() => {
       const o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), o3 = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
       const am = ctx.createGain(), lfo = ctx.createOscillator(), lfoG = ctx.createGain();
       o1.type = 'sawtooth'; o2.type = 'square'; o3.type = 'sine'; f.type = 'lowpass'; f.frequency.value = 500; f.Q.value = 2.5; g.gain.value = 0;
-      const o2g = ctx.createGain(); o2g.gain.value = 0.55; const o3g = ctx.createGain(); o3g.gain.value = 0.9;
+      const o2g = ctx.createGain(); o2g.gain.value = 0.5; const o3g = ctx.createGain(); o3g.gain.value = 0.45;
       lfo.type = 'sine'; lfoG.gain.value = 0.3; am.gain.value = 0.7; lfo.connect(lfoG); lfoG.connect(am.gain);
       o1.connect(f); o2.connect(o2g); o2g.connect(f); o3.connect(o3g); o3g.connect(am); f.connect(am); am.connect(g); g.connect(master);
       for (const o of [o1, o2, o3, lfo]) o.start();
@@ -903,18 +903,19 @@ const sfx = (() => {
       const t = ctx.currentTime, dt = Math.min(0.1, t - eng.last); eng.last = t;
       const u = Math.abs(speed) / vmax, rev = speed < -0.5;
       if (!rev) {
-        if (eng.gear < 5 && u > GEARS[eng.gear - 1] && eng.hold <= 0) { eng.gear++; eng.shift = 0.2; eng.hold = 1.1; if (on) { noise(0.07, 900, 200, 0.1, 'lowpass'); noise(0.05, 2600, 900, 0.06, 'bandpass', 2); } }
+        if (eng.gear < 5 && u > GEARS[eng.gear - 1] && eng.hold <= 0) { eng.gear++; eng.shift = 0.22; eng.hold = 0.7; if (on) { noise(0.07, 900, 200, 0.1, 'lowpass'); noise(0.05, 2600, 900, 0.06, 'bandpass', 2); } }
         else if (eng.gear > 1 && u < GEARS[eng.gear - 2] * 0.82) { eng.gear--; eng.hold = 0.6; if (on && thr) noise(0.05, 2200, 700, 0.05, 'bandpass', 2); }
       } else eng.gear = 1;
       const top = rev ? 0.3 : GEARS[eng.gear - 1];
       const target = !on ? 0 : 900 + 6600 * Math.pow(clamp(u / top, 0, 1.06), 0.85) * (thr ? 1 : 0.88) + (turbo ? 400 : 0);
-      eng.rpm += (target - eng.rpm) * Math.min(1, dt * (eng.shift > 0 ? 25 : 9));
+      // on an upshift the revs slide down to the new gear (clutch in), audibly, instead of jumping
+      eng.rpm += (target - eng.rpm) * Math.min(1, dt * (eng.shift > 0 ? 11 : 6));
       eng.shift = Math.max(0, eng.shift - dt); eng.hold -= dt;
-      const fire = eng.rpm / 60 * 3;
+      const fire = eng.rpm / 60 * 4;
       eng.o1.frequency.setTargetAtTime(fire, t, 0.02); eng.o2.frequency.setTargetAtTime(fire * 0.5, t, 0.02); eng.o3.frequency.setTargetAtTime(fire * 0.25, t, 0.02);
       eng.lfo.frequency.setTargetAtTime(fire / 8, t, 0.05); eng.lfoG.gain.setTargetAtTime(eng.rpm < 1500 ? 0.3 : 0.08, t, 0.1);
       eng.f.frequency.setTargetAtTime(220 + eng.rpm * 0.2 + thr * 650 + (turbo ? 500 : 0), t, 0.04);
-      eng.g.gain.setTargetAtTime(on ? (0.035 + 0.04 * thr) * (eng.shift > 0 ? 0.3 : 1) : 0, t, eng.shift > 0 ? 0.015 : 0.08);
+      eng.g.gain.setTargetAtTime(on ? (0.035 + 0.04 * thr) * (eng.shift > 0.12 ? 0.55 : 1) : 0, t, 0.03);
     },
     mg(x, z, mine, kind) {
       if (budget-- <= 0) return; const v = mine ? 1 : vol(x, z, 70) * 0.7;
@@ -1613,19 +1614,37 @@ const groundLines = (() => {
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
   const mat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; scene.add(mesh);
-  for (let i = 0; i < n; i++) pts.push({ x: 0, y: 0, z: 0, h: Math.random(), w: rnd(0.06, 0.2), live: false });
-  // is this spot on the driving surface, at the car's level?
-  const onRoad = (x, z, y) => {
-    if (MODE !== 'arena') return !T.isClear(x, z, HALF_W - 0.8);
+  for (let i = 0; i < n; i++) pts.push({ x: 0, y: 0, z: 0, dx: 0, dz: 1, h: Math.random(), w: rnd(0.025, 0.07), live: false });
+  let carIdx = -1;
+  // nearest track sample, searched around the previous one (full scan the first time)
+  const nearIdx = (x, z) => {
+    let best = 0, bd = Infinity;
+    const span = carIdx < 0 ? N : 40;
+    for (let k = 0; k < (carIdx < 0 ? N : span * 2 + 1); k++) {
+      const i = carIdx < 0 ? k : (carIdx + k - span + N) % N, dx = x - PX[i], dz = z - PZ[i], d = dx * dx + dz * dz;
+      if (d < bd) { bd = d; best = i; }
+    }
+    return best;
+  };
+  // arena: is this spot on the floor the car is driving on?
+  const onFloor = (x, z, y) => {
     if (Math.abs(x) > AR.W - 2 || Math.abs(z) > AR.D - 2) return false;
     const g = AR.surface(x, z, y + 0.9); return Math.abs(g - y) < 0.15 ? g : false;
   };
   const place = (q, p, fx, fz, ahead) => {
+    q.h = Math.random(); q.w = rnd(0.025, 0.07);
+    if (MODE !== 'arena') {
+      // on the track: a sample ahead along the racing line, lying along the track's direction
+      const dir = TX[carIdx] * fx + TZ[carIdx] * fz >= 0 ? 1 : -1;
+      const k = (carIdx + dir * Math.round((ahead ? rnd(18, 65) : rnd(-4, 65)) / SEG) + N * 4) % N, lat = rnd(-(HALF_W - 1), HALF_W - 1);
+      q.x = PX[k] + NX[k] * lat; q.z = PZ[k] + NZ[k] * lat; q.y = 0.03; q.dx = TX[k] * dir; q.dz = TZ[k] * dir; q.live = true;
+      return;
+    }
     for (let k = 0; k < 4; k++) {
       const f = ahead ? rnd(18, 65) : rnd(-4, 65), lat = rnd(-9, 9);
       const x = p.x + fx * f - fz * lat, z = p.z + fz * f + fx * lat, y = p.air ? 0 : (p.y || 0);
-      const g = onRoad(x, z, y);
-      if (g !== false) { q.x = x; q.z = z; q.y = (MODE === 'arena' ? g : 0) + 0.03; q.h = Math.random(); q.w = rnd(0.06, 0.2); q.live = true; return; }
+      const g = onFloor(x, z, y);
+      if (g !== false) { q.x = x; q.z = z; q.y = g + 0.03; q.dx = fx; q.dz = fz; q.live = true; return; }
     }
     q.live = false;
   };
@@ -1633,9 +1652,10 @@ const groundLines = (() => {
     const p = mode === 'race' && myCar && myCar.st;
     const sp = p && p.alive && !reduceMotion ? clamp((Math.abs(p.vF) - 14) / 26, 0, 1) * (p.turbo ? 1 : 0.8) : 0;
     mesh.visible = sp > 0.01;
-    if (!mesh.visible) { for (const q of pts) q.live = false; return; }
+    if (!mesh.visible) { for (const q of pts) q.live = false; carIdx = -1; return; }
     mat.opacity = ink.on ? 1 : 0.6;
     const fx = Math.sin(p.h), fz = Math.cos(p.h), base = Math.abs(p.vF) * (p.turbo ? 0.3 : 0.22);
+    if (MODE !== 'arena') carIdx = nearIdx(p.x, p.z);
     pts.forEach((q, i) => {
       const rx = q.x - p.x, rz = q.z - p.z, along = rx * fx + rz * fz;
       if (!q.live || along < -6 || along > 75 || Math.abs(rx * fz - rz * fx) > 11) place(q, p, fx, fz, q.live);
@@ -1643,8 +1663,9 @@ const groundLines = (() => {
       if (grow <= 0) { pos.fill(0, o, o + 18); return; }
       // a thin kite: sharp tail, widest a third of the way, sharp head
       const len = base * (0.6 + q.h * 0.8) * grow, w = q.w * grow, y = q.y;
-      const tx = q.x - fx * len, tz = q.z - fz * len, mx = q.x - fx * len * 0.35, mz = q.z - fz * len * 0.35;
-      const lx = mx - fz * w, lz = mz + fx * w, rx2 = mx + fz * w, rz2 = mz - fx * w;
+      const dx = q.dx, dz = q.dz;
+      const tx = q.x - dx * len, tz = q.z - dz * len, mx = q.x - dx * len * 0.35, mz = q.z - dz * len * 0.35;
+      const lx = mx - dz * w, lz = mz + dx * w, rx2 = mx + dz * w, rz2 = mz - dx * w;
       pos.set([tx, y, tz, lx, y, lz, rx2, y, rz2, lx, y, lz, q.x, y, q.z, rx2, y, rz2], o);
     });
     geo.attributes.position.needsUpdate = true;
@@ -1657,14 +1678,14 @@ const groundLines = (() => {
 // Scenery goes grey; only cars, their shots, pads and fire keep their colour.
 const INK_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
 const INK_FS = [
-  'uniform sampler2D tCol; uniform sampler2D tDep; uniform vec2 uRes; uniform float uNear, uFar, uTime, uSpeed, uPx;',
+  'uniform sampler2D tCol; uniform sampler2D tDep; uniform vec2 uRes, uSrc; uniform float uNear, uFar, uTime, uSpeed, uPx;',
   'uniform vec3 uPaper, uInk; varying vec2 vUv;',
   'float lin(float z){ return 2.0 * uNear * uFar / (uFar + uNear - (z * 2.0 - 1.0) * (uFar - uNear)); }',
   'float inv(vec2 uv){ return 1.0 / lin(texture2D(tDep, uv).x); }',
   'float lum(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }',
   'float hash(float n){ return fract(sin(n) * 43758.5453); }',
   'void main(){',
-  '  vec2 o = uPx / uRes;',
+  '  vec2 o = 1.0 / uSrc;',
   '  vec3 c = texture2D(tCol, vUv).rgb;',
   '  float d = lin(texture2D(tDep, vUv).x), w = 1.0 / d;',
   '  float wl = inv(vUv - vec2(o.x, 0.0)), wr = inv(vUv + vec2(o.x, 0.0)), wd = inv(vUv - vec2(0.0, o.y)), wu = inv(vUv + vec2(0.0, o.y));',
@@ -1693,10 +1714,13 @@ const INK_FS = [
 ].join('\n');
 const ink = (() => {
   const size = new THREE.Vector2(), fwd = new THREE.Vector3(), right = new THREE.Vector3(), moon0 = moon.position.clone();
-  const rt = new THREE.WebGLRenderTarget(2, 2, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+  // the scene is drawn at reduced resolution; the paper/ink threshold runs at full resolution on the
+  // smoothly upscaled colours, so the edges of the flat areas stay clean
+  const rt = new THREE.WebGLRenderTarget(2, 2, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+  const SCALE = { auto: 0.7, low: 0.6, med: 0.7, high: 0.85 }[QUALITY_LOADED];
   rt.depthTexture = new THREE.DepthTexture(2, 2); rt.depthTexture.type = THREE.UnsignedIntType;
   const uni = {
-    tCol: { value: rt.texture }, tDep: { value: rt.depthTexture }, uRes: { value: new THREE.Vector2(2, 2) },
+    tCol: { value: rt.texture }, tDep: { value: rt.depthTexture }, uRes: { value: new THREE.Vector2(2, 2) }, uSrc: { value: new THREE.Vector2(2, 2) },
     uNear: { value: camera.near }, uFar: { value: camera.far }, uTime: { value: 0 }, uSpeed: { value: 0 }, uPx: { value: 1 },
     uPaper: { value: new THREE.Color(0xf4f1ea) }, uInk: { value: new THREE.Color(0x0a0a0b) }
   };
@@ -1769,7 +1793,10 @@ const ink = (() => {
   }
   function render(speed) {
     renderer.getDrawingBufferSize(size);
-    if (size.x !== uni.uRes.value.x || size.y !== uni.uRes.value.y) { rt.setSize(size.x, size.y); uni.uRes.value.copy(size); }
+    if (size.x !== uni.uRes.value.x || size.y !== uni.uRes.value.y) {
+      uni.uRes.value.copy(size); uni.uSrc.value.set(Math.max(2, Math.round(size.x * SCALE)), Math.max(2, Math.round(size.y * SCALE)));
+      rt.setSize(uni.uSrc.value.x, uni.uSrc.value.y);
+    }
     uni.uPx.value = Math.max(1, size.y / 720);
     uni.uTime.value = time; uni.uSpeed.value = reduceMotion ? 0 : speed;
     // the key light follows the camera (above, behind, from the left) so the faces we see are mostly paper
@@ -1801,7 +1828,7 @@ const ink = (() => {
   st.lines = speed => {
     if (reduceMotion || speed < 0.01) return;
     renderer.getDrawingBufferSize(size); uni.uRes.value.copy(size); uni.uTime.value = time; uni.uSpeed.value = speed;
-    renderer.autoClear = false; renderer.render(linesScene, postCam); renderer.autoClear = true;
+    renderer.autoClear = false; renderer.info.autoReset = false; renderer.render(linesScene, postCam); renderer.autoClear = true; renderer.info.autoReset = true;
   };
   return st;
 })();
