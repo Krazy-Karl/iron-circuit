@@ -178,7 +178,7 @@ Les IA reçoivent des configurations au hasard.
 | `E` | Arme arrière : huile, mines ou fumée |
 | `C` | Recentrer la caméra derrière la voiture |
 | `M` | Couper ou remettre le son |
-| `Échap` | Menu : réglages de sensibilité et de suivi caméra |
+| `Échap` | Menu : sensibilité, suivi caméra, qualité et **style graphique** (Classique ou Encre : rendu manga noir et blanc où seule la couleur de chaque voiture, de ses tirs et de ses roquettes reste vive) |
 | `F3` | Mesures de performance (images/s, ping, charge du serveur) avec un diagnostic |
 
 Plaques au sol : **rouge** +2 roquettes · **ambre** arme arrière · **verte** +35 de blindage.

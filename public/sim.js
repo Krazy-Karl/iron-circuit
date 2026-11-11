@@ -960,7 +960,7 @@ function createRace(T, opts) {
         r2(c.steerSm), r2(c.nitro), c.rockets, c.rear ? REAR_CODE[c.rear] : 0, c.rearN, r2(c.heat), r2(c.overheat), Math.round(c.progress),
         r2(c.finishTime), c.kills, c.deaths, r2(c.respawnT), r2(c.smokeT), r2(c.invuln), r3(c.turretPitch), r2(Math.max(0, c.oil)), r2(c.oilSpin), r2(c.y || 0), r2(c.vy || 0), Math.ceil(c.shield || 0), r2(Math.max(0, c.shieldT || 0))
       ]),
-      r: R.rockets.map(r => [r.id, r2(r.x), r2(r.z), r3(r.h), r2(r.y), r.mini ? 1 : 0, r.target ? r.target.id : -1]),
+      r: R.rockets.map(r => [r.id, r2(r.x), r2(r.z), r3(r.h), r2(r.y), r.mini ? 1 : 0, r.target ? r.target.id : -1, r.owner.id]),
       m: R.mines.map(m => [m.id, r2(m.x), r2(m.z), m.arm <= 0 ? 1 : 0, r2(m.y || 0)]),
       o: R.slicks.map(s => [s.id, r2(s.x), r2(s.z), r2(s.life), r2(s.y || 0)]),
       p: R.pads.map(p => p.active ? 1 : 0).join(''),

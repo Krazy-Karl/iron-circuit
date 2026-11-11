@@ -176,6 +176,12 @@ td em{font-style:normal;color:var(--dim);font-size:13px;margin-left:6px}
 #lockMark span{position:absolute;top:58px;left:50%;transform:translateX(-50%);font-size:13px;font-weight:700;letter-spacing:.14em;white-space:nowrap;color:var(--sodium);text-shadow:0 1px 2px #000}
 #lockMark.locked span{color:var(--blood)}
 #players li small .lo{display:block;letter-spacing:.04em;color:var(--dim);font-size:12px}
+/* ink style: manga lettering (light text, black outline) over the paper-white scene */
+body.ink #hudRoot,body.ink #countdown,body.ink #crossTxt,body.ink #lockMark span{text-shadow:2px 2px 0 #111,-1px -1px 0 #111,1px -1px 0 #111,-1px 1px 0 #111,0 0 6px rgba(0,0,0,.5)}
+body.ink #hudRoot .hud{filter:drop-shadow(0 0 1px #111)}
+body.ink #cross .ring,body.ink #cross .tick{stroke:#111;stroke-width:3}
+body.ink #cross .track{stroke:rgba(0,0,0,.18)}
+body.ink #gunMark{border-color:#111;box-shadow:0 0 0 1px var(--sodium)}
 .settings{display:grid;gap:14px;padding-top:14px;border-top:1px solid var(--line)}
 .set{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center}
 .set label{font-size:16px}
@@ -427,7 +433,8 @@ const r3 = v => Math.round(v * 1000) / 1000;
 const settings = {
   sens: parseFloat(store.get('ironcircuit.sens')) || 1,
   follow: parseFloat(store.get('ironcircuit.follow')) || 2.2,
-  quality: store.get('ironcircuit.quality') || 'auto'
+  quality: store.get('ironcircuit.quality') || 'auto',
+  style: store.get('ironcircuit.style') === 'ink' ? 'ink' : 'classic'
 };
 if (!['auto', 'low', 'med', 'high'].includes(settings.quality)) settings.quality = 'auto';
 // graphics presets; materials and antialiasing are chosen when the page loads
@@ -454,7 +461,7 @@ scene.fog = new THREE.Fog(0x090b10, 80, 320);
 const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 900);
 function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
-scene.add(new THREE.HemisphereLight(0x7486a6, 0x1d1913, 0.8));
+const hemi = new THREE.HemisphereLight(0x7486a6, 0x1d1913, 0.8); scene.add(hemi);
 const moon = new THREE.DirectionalLight(0xb6c3dc, 0.55); moon.position.set(-80, 150, 60); scene.add(moon);
 const sodiumLamp = new THREE.PointLight(0xffa640, 1.3, 75, 2); scene.add(sodiumLamp);
 const boomLights = (Q.boom ? [0, 1] : []).map(() => { const l = new THREE.PointLight(0xff8a3a, 0, 40, 2); scene.add(l); return { l, t: 0 }; });
@@ -562,6 +569,7 @@ trackRoot.add(new THREE.Mesh(ribbon(-(HALF_W + 1), HALF_W + 1, 0.01, 0.01, 10), 
   const headMat = new THREE.MeshBasicMaterial({ color: 0xffd38a });
   const coneMat = new THREE.MeshBasicMaterial({ color: 0xffb04a, transparent: true, opacity: 0.07, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
   const poolMat = new THREE.MeshBasicMaterial({ map: radialTex, color: 0xffa040, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending });
+  coneMat.userData.inkHide = poolMat.userData.inkHide = true;
   for (let k = 0; k < 14; k++) {
     const i = Math.floor(k * N / 14 + 40) % N;
     let side = k % 2 ? 1 : -1;
@@ -1291,7 +1299,7 @@ function onSnap(m) {
   for (const r of m.r) {
     seenR.add(r[0]);
     let o = rocketObjs.get(r[0]);
-    if (!o) { const mesh = new THREE.Mesh(rocketGeo, rocketMat); mesh.rotation.order = 'YXZ'; mesh.rotation.set(PI / 2, r[3], 0); mesh.position.set(r[1], r[4] || 1.5, r[2]); if (r[5]) mesh.scale.setScalar(0.6); scene.add(mesh); o = { m: mesh }; rocketObjs.set(r[0], o); }
+    if (!o) { const mesh = new THREE.Mesh(rocketGeo, rocketMat); mesh.rotation.order = 'YXZ'; mesh.rotation.set(PI / 2, r[3], 0); mesh.position.set(r[1], r[4] || 1.5, r[2]); if (r[5]) mesh.scale.setScalar(0.6); scene.add(mesh); o = { m: mesh, col: carById(r[7]) ? carById(r[7]).color : 0xffa040 }; rocketObjs.set(r[0], o); }
   }
   for (const [id, o] of rocketObjs) if (!seenR.has(id)) { scene.remove(o.m); rocketObjs.delete(id); }
   const seenM = new Set();
@@ -1328,7 +1336,8 @@ function handleEvent(e) {
       const t = tracers[tracerIdx]; tracerIdx = (tracerIdx + 1) % tracers.length;
       const gk = e.g || 'mg', ti = tracers.indexOf(t);
       Object.assign(t, { on: true, id: e.id, x: e.x, y: e.y, z: e.z, vx: e.vx, vy: e.vy, vz: e.vz, life: e.l || 0.45, len: gk === 'cannon' ? 5 : gk === 'shotgun' ? 1.2 : 2.4 });
-      trCol.set(gk === 'cannon' ? [1, 1, 0.85, 1, 0.6, 0.2] : gk === 'shotgun' ? [1, 0.75, 0.4, 0.8, 0.35, 0.15] : [1, 0.9, 0.6, 0.9, 0.45, 0.25], ti * 6); trGeo.attributes.color.needsUpdate = true;
+      if (ink.on && carById(e.c)) { tmpCol.setHex(carById(e.c).color); trCol.set([1, 1, 1, tmpCol.r, tmpCol.g, tmpCol.b], ti * 6); }
+      else trCol.set(gk === 'cannon' ? [1, 1, 0.85, 1, 0.6, 0.2] : gk === 'shotgun' ? [1, 0.75, 0.4, 0.8, 0.35, 0.15] : [1, 0.9, 0.6, 0.9, 0.45, 0.25], ti * 6); trGeo.attributes.color.needsUpdate = true;
       if (!e.k) {
         fx.spawn(e.x, e.y, e.z, 0, 0, 0, gk === 'mg' ? 0.05 : 0.09, gk === 'mg' ? 1.1 : 2.2, 0.6, 0xffc060, 1);
         sfx.mg(e.x, e.z, mine(e.c), gk);
@@ -1543,6 +1552,137 @@ $('pauseTitle').textContent = SOLO ? 'PAUSE' : 'MENU';
 $('pauseEyebrow').textContent = SOLO ? 'Course suspendue' : 'La course continue pendant que ce menu est ouvert';
 $('quitBtn').textContent = SOLO ? 'Abandonner' : 'Quitter la partie';
 
+/* ================= Ink style ================= */
+// Manga look: the scene is rendered to a texture, then one full-screen pass turns it into
+// paper and ink (flat tones, halftone dots, outlines from depth, speed lines).
+// Scenery goes grey; only cars, their shots, pads and fire keep their colour.
+const INK_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+const INK_FS = [
+  'uniform sampler2D tCol; uniform sampler2D tDep; uniform vec2 uRes; uniform float uNear, uFar, uTime, uSpeed, uPx;',
+  'uniform vec3 uPaper, uInk; varying vec2 vUv;',
+  'float lin(float z){ return 2.0 * uNear * uFar / (uFar + uNear - (z * 2.0 - 1.0) * (uFar - uNear)); }',
+  'float inv(vec2 uv){ return 1.0 / lin(texture2D(tDep, uv).x); }',
+  'float lum(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }',
+  'float hash(float n){ return fract(sin(n) * 43758.5453); }',
+  'float dots(float k){',
+  '  vec2 p = gl_FragCoord.xy / (4.5 * uPx); p = vec2(p.x + p.y, p.y - p.x) * 0.7071;',
+  '  float d = length(fract(p) - 0.5), rad = sqrt(clamp(1.0 - k, 0.0, 1.0)) * 0.62;',
+  '  return smoothstep(rad - 0.08, rad + 0.08, d);',
+  '}',
+  'void main(){',
+  '  vec2 o = uPx / uRes;',
+  '  vec3 c = texture2D(tCol, vUv).rgb;',
+  '  float zc = texture2D(tDep, vUv).x, d = lin(zc), w = 1.0 / d;',
+  '  float wl = inv(vUv - vec2(o.x, 0.0)), wr = inv(vUv + vec2(o.x, 0.0)), wd = inv(vUv - vec2(0.0, o.y)), wu = inv(vUv + vec2(0.0, o.y));',
+  '  float edgeD = smoothstep(0.06, 0.18, abs(wl + wr + wd + wu - 4.0 * w) / w);',
+  '  vec3 cl = texture2D(tCol, vUv - vec2(o.x, 0.0)).rgb, cr = texture2D(tCol, vUv + vec2(o.x, 0.0)).rgb;',
+  '  vec3 cd = texture2D(tCol, vUv - vec2(0.0, o.y)).rgb, cu = texture2D(tCol, vUv + vec2(0.0, o.y)).rgb;',
+  '  float gx = lum(cr) - lum(cl), gy = lum(cu) - lum(cd);',
+  '  float edgeL = smoothstep(0.1, 0.22, length(vec2(gx, gy)));',
+  '  float fade = 1.0 - smoothstep(110.0, 240.0, d);',
+  '  float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), sat = mx > 0.02 ? (mx - mn) / mx : 0.0;',
+  '  float L = lum(c);',
+  '  vec3 col;',
+  '  if (sat > 0.42 && mx > 0.16) {',
+  '    vec3 hue = c / mx;',
+  '    col = mx > 0.42 ? hue : mix(uInk, hue * 0.75, dots(0.45));',
+  '  } else {',
+  '    float t = clamp(L * 1.9, 0.0, 1.0);',
+  '    float shade = t > 0.6 ? 1.0 : t > 0.24 ? dots((t - 0.24) / 0.36) : 0.0;',
+  '    col = mix(uInk, uPaper, shade);',
+  '  }',
+  '  col = mix(col, uInk, max(edgeD, edgeL * 0.85) * fade);',
+  '  if (uSpeed > 0.01) {',
+  '    vec2 q = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0);',
+  '    float r = length(q), a = atan(q.y, q.x) / 6.2831853 + 0.5, bins = 240.0;',
+  '    float id = floor(a * bins), h = hash(id * 1.37 + floor(uTime * 14.0));',
+  '    float on = step(1.0 - uSpeed * 0.5, h);',
+  '    float thin = 1.0 - smoothstep(0.08, 0.3, abs(fract(a * bins) - 0.5) * (1.4 + r));',
+  '    float line = on * thin * smoothstep(0.38 + h * 0.2, 0.75, r);',
+  '    col = mix(col, lum(col) > 0.5 ? uInk : uPaper, line * 0.8);',
+  '  }',
+  '  gl_FragColor = vec4(col, 1.0);',
+  '}'
+].join('\n');
+const ink = (() => {
+  const size = new THREE.Vector2();
+  const rt = new THREE.WebGLRenderTarget(2, 2, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+  rt.depthTexture = new THREE.DepthTexture(2, 2); rt.depthTexture.type = THREE.UnsignedIntType;
+  const uni = {
+    tCol: { value: rt.texture }, tDep: { value: rt.depthTexture }, uRes: { value: new THREE.Vector2(2, 2) },
+    uNear: { value: camera.near }, uFar: { value: camera.far }, uTime: { value: 0 }, uSpeed: { value: 0 }, uPx: { value: 1 },
+    uPaper: { value: new THREE.Color(0xf1ede3) }, uInk: { value: new THREE.Color(0x111214) }
+  };
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: uni, vertexShader: INK_VS, fragmentShader: INK_FS, depthTest: false, depthWrite: false }));
+  quad.frustumCulled = false;
+  const postScene = new THREE.Scene(); postScene.add(quad);
+  const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  // grey copies of the scenery textures
+  const greyTex = new Map();
+  function grey(t) {
+    if (!t || !t.image || !t.image.getContext) return t;
+    if (greyTex.has(t)) return greyTex.get(t);
+    const src = t.image, [c, g] = cv(src.width, src.height);
+    g.drawImage(src, 0, 0);
+    const im = g.getImageData(0, 0, c.width, c.height), px = im.data;
+    for (let i = 0; i < px.length; i += 4) { const l = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]; px[i] = px[i + 1] = px[i + 2] = l; }
+    g.putImageData(im, 0, 0);
+    const n = t.clone(); n.image = c; n.needsUpdate = true; greyTex.set(t, n); return n;
+  }
+  const greyCol = col => { const l = col.r * 0.299 + col.g * 0.587 + col.b * 0.114; return new THREE.Color(l, l, l); };
+  const saved = new Map(), hidden = [];
+  const keep = o => o === barrelIM || padGlows.includes(o) || o.material === ventGlowMat || Object.values(padTexs).includes(o.material.map);
+  function collect() {
+    const list = [];
+    for (const root of [trackRoot, arenaRoot, ground]) root.traverse(o => { if (o.isMesh && !keep(o)) list.push(o); });
+    return list;
+  }
+  const light0 = { hemiC: hemi.color.clone(), hemiG: hemi.groundColor.clone(), hemiI: hemi.intensity, moonC: moon.color.clone(), moonI: moon.intensity, lampC: sodiumLamp.color.clone(), lampI: sodiumLamp.intensity, bg: scene.background.clone(), fog: scene.fog.color.clone() };
+  const st = { on: false, apply, render };
+  function apply(on) {
+    if (on === st.on) return;
+    st.on = on; document.body.classList.toggle('ink', on);
+    for (const o of collect()) {
+      if (o.material.userData.inkHide) { o.visible = !on; continue; }
+      const m = o.material;
+      if (!saved.has(m)) saved.set(m, { color: m.color && m.color.clone(), map: m.map, emissive: m.emissive && m.emissive.clone() });
+      const s0 = saved.get(m);
+      if (m.color) m.color.copy(on ? greyCol(s0.color) : s0.color);
+      if (m.emissive) m.emissive.copy(on ? greyCol(s0.emissive) : s0.emissive);
+      if (s0.map) m.map = on ? grey(s0.map) : s0.map;
+      if (o.isInstancedMesh && o.instanceColor) {
+        const a = o.instanceColor.array;
+        if (!o.userData.col0) o.userData.col0 = a.slice();
+        const c0 = o.userData.col0;
+        for (let i = 0; i < a.length; i += 3) { const l = on ? c0[i] * 0.299 + c0[i + 1] * 0.587 + c0[i + 2] * 0.114 : 0; a[i] = on ? l : c0[i]; a[i + 1] = on ? l : c0[i + 1]; a[i + 2] = on ? l : c0[i + 2]; }
+        o.instanceColor.needsUpdate = true;
+      }
+      m.needsUpdate = true;
+    }
+    if (on) {
+      hemi.color.setHex(0xffffff); hemi.groundColor.setHex(0x8a8a8a); hemi.intensity = 1.05;
+      moon.color.setHex(0xffffff); moon.intensity = 0.9;
+      sodiumLamp.color.setHex(0xffffff); sodiumLamp.intensity = 0.6;
+      scene.background.copy(uni.uPaper.value); scene.fog.color.copy(uni.uPaper.value);
+    } else {
+      hemi.color.copy(light0.hemiC); hemi.groundColor.copy(light0.hemiG); hemi.intensity = light0.hemiI;
+      moon.color.copy(light0.moonC); moon.intensity = light0.moonI;
+      sodiumLamp.color.copy(light0.lampC); sodiumLamp.intensity = light0.lampI;
+      scene.background.copy(light0.bg); scene.fog.color.copy(light0.fog);
+    }
+  }
+  function render(speed) {
+    renderer.getDrawingBufferSize(size);
+    if (size.x !== uni.uRes.value.x || size.y !== uni.uRes.value.y) { rt.setSize(size.x, size.y); uni.uRes.value.copy(size); }
+    uni.uPx.value = Math.max(1, size.y / 720);
+    uni.uTime.value = time; uni.uSpeed.value = reduceMotion ? 0 : speed;
+    renderer.setRenderTarget(rt); renderer.render(scene, camera);
+    renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+  }
+  return st;
+})();
+ink.apply(settings.style === 'ink');
+
 /* ================= Settings ================= */
 const FOLLOW_WORDS = v => v < 1.8 ? 'Très souple' : v < 3 ? 'Souple' : v < 5 ? 'Moyen' : 'Rigide';
 const settingInputs = [];
@@ -1554,11 +1694,14 @@ document.querySelectorAll('[data-settings]').forEach((box, n) => {
     '<input type="range" id="follow' + n + '" min="1" max="8" step="0.1"></div>' +
     '<div class="set"><span class="lbl">QUALITÉ GRAPHIQUE</span><span></span><div class="seg" data-quality>' +
     '<button type="button" data-q="auto">Auto</button><button type="button" data-q="low">Basse</button><button type="button" data-q="med">Moyenne</button><button type="button" data-q="high">Haute</button></div>' +
-    '<span class="note" style="grid-column:1/-1" data-qnote></span></div>';
+    '<span class="note" style="grid-column:1/-1" data-qnote></span></div>' +
+    '<div class="set"><span class="lbl">STYLE GRAPHIQUE</span><span></span><div class="seg" data-style>' +
+    '<button type="button" data-s="classic">Classique</button><button type="button" data-s="ink">Encre</button></div></div>';
   settingInputs.push({ sens: $('sens' + n), sensOut: $('sensOut' + n), follow: $('follow' + n), followOut: $('followOut' + n) });
 });
 function renderSettings() {
   document.querySelectorAll('[data-quality] button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.q === settings.quality)));
+  document.querySelectorAll('[data-style] button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.s === settings.style)));
   document.querySelectorAll('[data-qnote]').forEach(n => { n.textContent = settings.quality !== QUALITY_LOADED ? 'Recharge la page pour appliquer complètement ce réglage.' : settings.quality === 'auto' ? 'Auto ajuste la résolution pour garder 60 images/s.' : 'Baisse la qualité si le jeu saccade.'; });
   for (const s of settingInputs) {
     s.sens.value = settings.sens; s.sensOut.textContent = '×' + settings.sens.toFixed(2);
@@ -1573,6 +1716,9 @@ document.querySelectorAll('[data-quality] button').forEach(b => b.addEventListen
   settings.quality = b.dataset.q; store.set('ironcircuit.quality', settings.quality);
   setRatio(Math.min(window.devicePixelRatio || 1, QUALITY[settings.quality].ratio));
   renderSettings();
+}));
+document.querySelectorAll('[data-style] button').forEach(b => b.addEventListener('click', () => {
+  settings.style = b.dataset.s; store.set('ironcircuit.style', settings.style); ink.apply(settings.style === 'ink'); renderSettings();
 }));
 renderSettings();
 
@@ -1704,7 +1850,7 @@ function updateVisuals(dt, time) {
   }
   for (const o of rocketObjs.values()) {
     const p = o.m.position;
-    fx.spawn(p.x, p.y, p.z, 0, 0, 0, 0.18, 0.9, 0.3, 0xffa040, 1);
+    fx.spawn(p.x, p.y, p.z, 0, 0, 0, 0.18, 0.9, 0.3, ink.on ? o.col : 0xffa040, 1);
     if (Math.random() < 0.7) smoke.spawn(p.x, p.y, p.z, rnd(-0.5, 0.5), rnd(0.2, 1), rnd(-0.5, 0.5), rnd(0.6, 1.1), 0.6, 2.2, 0x5a5550, 0.55);
   }
   for (const o of mineObjs.values()) o.led.visible = !o.armed || (time * 4 % 1) < 0.5;
@@ -2169,7 +2315,10 @@ function frame(now) {
   const tC = performance.now();
   gpuPoll();
   const gq = gpuBegin();
-  renderer.render(scene, camera);
+  if (ink.on) {
+    const p = mode === 'race' && myCar && myCar.st;
+    ink.render(p && p.alive ? clamp((Math.abs(p.vF) - 22) / 22, 0, 1) * (p.turbo ? 1 : 0.7) : 0);
+  } else renderer.render(scene, camera);
   gpuEnd(gq);
   perfFrame(rawMs, tB - tA, tC - tB, performance.now() - tC);
 }
