@@ -2664,8 +2664,11 @@ const ink = (() => {
     // the key light follows the camera (above, behind, from the left) so the faces we see are mostly paper
     camera.getWorldDirection(fwd); right.crossVectors(fwd, camera.up).normalize();
     moon.position.copy(camera.up).multiplyScalar(0.75).addScaledVector(fwd, -0.45).addScaledVector(right, -0.5).multiplyScalar(100);
+    // count both passes in the F3 panel (three.js resets its counters on every render call)
+    renderer.info.autoReset = false; renderer.info.reset();
     renderer.setRenderTarget(rt); renderer.render(scene, camera);
     renderer.setRenderTarget(null); renderer.render(postScene, postCam);
+    renderer.info.autoReset = true;
   }
   return st;
 })();
