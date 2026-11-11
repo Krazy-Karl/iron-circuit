@@ -1648,7 +1648,7 @@ let barrelIM = null;
     const [c, g] = cv(256, 256);
     g.fillStyle = '#2b2c2f'; g.fillRect(0, 0, 256, 256); speckle(g, 256, 256, 2400, ['#323337', '#25262a', '#38393d']);
     g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, 0, 256, 3); g.fillRect(0, 0, 3, 256);
-    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(AW / 8, AD / 8); return t;
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(AW / 8, AD / 8); t.inkKind = 'yard'; return t;
   })();
   const stripeTex = (() => {
     const [c, g] = cv(64, 16); g.fillStyle = '#121212'; g.fillRect(0, 0, 64, 16); g.fillStyle = '#e0a52a';
@@ -2552,60 +2552,56 @@ const INK_FS = [
   'float inv(vec2 uv){ return 1.0 / lin(texture2D(tDep, uv).x); }',
   'float lum(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }',
   'float hash(float n){ return fract(sin(n) * 43758.5453); }',
-  'float dots(float k){',
-  '  vec2 p = gl_FragCoord.xy / (4.5 * uPx); p = vec2(p.x + p.y, p.y - p.x) * 0.7071;',
-  '  float d = length(fract(p) - 0.5), rad = sqrt(clamp(1.0 - k, 0.0, 1.0)) * 0.62;',
-  '  return smoothstep(rad - 0.08, rad + 0.08, d);',
-  '}',
   'void main(){',
   '  vec2 o = uPx / uRes;',
   '  vec3 c = texture2D(tCol, vUv).rgb;',
-  '  float zc = texture2D(tDep, vUv).x, d = lin(zc), w = 1.0 / d;',
+  '  float d = lin(texture2D(tDep, vUv).x), w = 1.0 / d;',
   '  float wl = inv(vUv - vec2(o.x, 0.0)), wr = inv(vUv + vec2(o.x, 0.0)), wd = inv(vUv - vec2(0.0, o.y)), wu = inv(vUv + vec2(0.0, o.y));',
-  '  float edgeD = smoothstep(0.06, 0.18, abs(wl + wr + wd + wu - 4.0 * w) / w);',
-  '  vec3 cl = texture2D(tCol, vUv - vec2(o.x, 0.0)).rgb, cr = texture2D(tCol, vUv + vec2(o.x, 0.0)).rgb;',
-  '  vec3 cd = texture2D(tCol, vUv - vec2(0.0, o.y)).rgb, cu = texture2D(tCol, vUv + vec2(0.0, o.y)).rgb;',
-  '  float gx = lum(cr) - lum(cl), gy = lum(cu) - lum(cd);',
-  '  float edgeL = smoothstep(0.1, 0.22, length(vec2(gx, gy)));',
-  '  float fade = 1.0 - smoothstep(110.0, 240.0, d);',
+  '  float edge = smoothstep(0.08, 0.22, abs(wl + wr + wd + wu - 4.0 * w) / w) * (1.0 - smoothstep(90.0, 200.0, d));',
+  '  bool nearSide = w * 4.0 > wl + wr + wd + wu;',
   '  float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), sat = mx > 0.02 ? (mx - mn) / mx : 0.0;',
-  '  float L = lum(c);',
-  '  vec3 col;',
-  '  if (sat > 0.42 && mx > 0.16) {',
-  '    vec3 hue = c / mx;',
-  '    col = mx > 0.42 ? hue : mix(uInk, hue * 0.75, dots(0.45));',
-  '  } else {',
-  '    float t = clamp(L * 1.9, 0.0, 1.0);',
-  '    float shade = t > 0.6 ? 1.0 : t > 0.24 ? dots((t - 0.24) / 0.36) : 0.0;',
-  '    col = mix(uInk, uPaper, shade);',
-  '  }',
-  '  col = mix(col, uInk, max(edgeD, edgeL * 0.85) * fade);',
+  '  vec3 col; bool dark;',
+  '  if (sat > 0.42 && mx > 0.14) { dark = mx < 0.34; col = dark ? uInk : c / mx; }',
+  '  else { dark = lum(c) < 0.42; col = dark ? uInk : uPaper; }',
+  // negative space: ink line where a light shape ends, a thin light rim where a dark shape sits in front
+  '  if (!dark) col = mix(col, uInk, edge);',
+  '  else if (nearSide) col = mix(col, uPaper, edge * 0.9);',
   '  if (uSpeed > 0.01) {',
   '    vec2 q = (vUv - 0.5) * vec2(uRes.x / uRes.y, 1.0);',
-  '    float r = length(q), a = atan(q.y, q.x) / 6.2831853 + 0.5, bins = 240.0;',
-  '    float id = floor(a * bins), h = hash(id * 1.37 + floor(uTime * 14.0));',
-  '    float on = step(1.0 - uSpeed * 0.5, h);',
-  '    float thin = 1.0 - smoothstep(0.08, 0.3, abs(fract(a * bins) - 0.5) * (1.4 + r));',
-  '    float line = on * thin * smoothstep(0.38 + h * 0.2, 0.75, r);',
-  '    col = mix(col, lum(col) > 0.5 ? uInk : uPaper, line * 0.8);',
+  '    float r = length(q), a = atan(q.y, q.x) / 6.2831853 + 0.5, bins = 150.0;',
+  '    float id = floor(a * bins), h = hash(id * 1.37 + floor(uTime * 10.0));',
+  '    float on = step(1.0 - uSpeed * 0.45, h);',
+  '    float start = 0.3 + hash(id + 7.1) * 0.3;',
+  '    float taper = smoothstep(start, start + 0.35, r);',
+  '    float thin = 1.0 - smoothstep(0.0, 0.5 * taper, abs(fract(a * bins) - 0.5));',
+  '    float line = on * thin * taper;',
+  '    col = mix(col, lum(col) > 0.5 ? uInk : uPaper, line);',
   '  }',
   '  gl_FragColor = vec4(col, 1.0);',
   '}'
 ].join('\n');
 const ink = (() => {
-  const size = new THREE.Vector2();
+  const size = new THREE.Vector2(), fwd = new THREE.Vector3(), right = new THREE.Vector3(), moon0 = moon.position.clone();
   const rt = new THREE.WebGLRenderTarget(2, 2, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
   rt.depthTexture = new THREE.DepthTexture(2, 2); rt.depthTexture.type = THREE.UnsignedIntType;
   const uni = {
     tCol: { value: rt.texture }, tDep: { value: rt.depthTexture }, uRes: { value: new THREE.Vector2(2, 2) },
     uNear: { value: camera.near }, uFar: { value: camera.far }, uTime: { value: 0 }, uSpeed: { value: 0 }, uPx: { value: 1 },
-    uPaper: { value: new THREE.Color(0xf1ede3) }, uInk: { value: new THREE.Color(0x111214) }
+    uPaper: { value: new THREE.Color(0xf4f1ea) }, uInk: { value: new THREE.Color(0x0a0a0b) }
   };
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: uni, vertexShader: INK_VS, fragmentShader: INK_FS, depthTest: false, depthWrite: false }));
   quad.frustumCulled = false;
   const postScene = new THREE.Scene(); postScene.add(quad);
   const postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-  // grey copies of the scenery textures
+  // clean flat textures for the ink style (speckle noise would turn into ink spatter)
+  const flat = (w, h, draw, src) => { const [c, g] = cv(w, h); draw(g); const t = new THREE.CanvasTexture(c); t.wrapS = src.wrapS; t.wrapT = src.wrapT; t.repeat.copy(src.repeat); t.anisotropy = 8; return t; };
+  const inkMaps = new Map([
+    [roadTex, flat(256, 256, g => { g.fillStyle = '#fff'; g.fillRect(0, 0, 256, 256); g.fillStyle = '#000'; g.fillRect(0, 0, 16, 256); g.fillRect(240, 0, 16, 256); g.fillRect(122, 0, 12, 110); }, roadTex)],
+    [wallTex, flat(128, 128, g => { g.fillStyle = '#fff'; g.fillRect(0, 0, 128, 128); g.fillStyle = '#000'; for (let x = -128; x < 256; x += 48) { g.beginPath(); g.moveTo(x, 128); g.lineTo(x + 20, 128); g.lineTo(x + 60, 0); g.lineTo(x + 40, 0); g.fill(); } }, wallTex)],
+    [concreteTex, flat(8, 8, g => { g.fillStyle = '#fff'; g.fillRect(0, 0, 8, 8); }, concreteTex)],
+    [groundTex, flat(8, 8, g => { g.fillStyle = '#000'; g.fillRect(0, 0, 8, 8); }, groundTex)]
+  ]);
+  const inkMap = t => { if (inkMaps.has(t)) return inkMaps.get(t); if (t && t.inkKind === 'yard') { const n = flat(256, 256, g => { g.fillStyle = '#fff'; g.fillRect(0, 0, 256, 256); g.fillStyle = '#000'; g.fillRect(0, 0, 256, 4); g.fillRect(0, 0, 4, 256); }, t); inkMaps.set(t, n); return n; } return grey(t); };
   const greyTex = new Map();
   function grey(t) {
     if (!t || !t.image || !t.image.getContext) return t;
@@ -2617,7 +2613,7 @@ const ink = (() => {
     g.putImageData(im, 0, 0);
     const n = t.clone(); n.image = c; n.needsUpdate = true; greyTex.set(t, n); return n;
   }
-  const greyCol = col => { const l = col.r * 0.299 + col.g * 0.587 + col.b * 0.114; return new THREE.Color(l, l, l); };
+  const greyCol = col => { const l = col.r * 0.299 + col.g * 0.587 + col.b * 0.114; return new THREE.Color().setScalar(l > 0.02 ? 1 : 0); };
   const saved = new Map(), hidden = [];
   const keep = o => o === barrelIM || padGlows.includes(o) || o.material === ventGlowMat || Object.values(padTexs).includes(o.material.map);
   function collect() {
@@ -2637,24 +2633,25 @@ const ink = (() => {
       const s0 = saved.get(m);
       if (m.color) m.color.copy(on ? greyCol(s0.color) : s0.color);
       if (m.emissive) m.emissive.copy(on ? greyCol(s0.emissive) : s0.emissive);
-      if (s0.map) m.map = on ? grey(s0.map) : s0.map;
+      if (s0.map) m.map = on ? inkMap(s0.map) : s0.map;
       if (o.isInstancedMesh && o.instanceColor) {
         const a = o.instanceColor.array;
         if (!o.userData.col0) o.userData.col0 = a.slice();
         const c0 = o.userData.col0;
-        for (let i = 0; i < a.length; i += 3) { const l = on ? c0[i] * 0.299 + c0[i + 1] * 0.587 + c0[i + 2] * 0.114 : 0; a[i] = on ? l : c0[i]; a[i + 1] = on ? l : c0[i + 1]; a[i + 2] = on ? l : c0[i + 2]; }
+        for (let i = 0; i < a.length; i += 3) { const l = 1; a[i] = on ? l : c0[i]; a[i + 1] = on ? l : c0[i + 1]; a[i + 2] = on ? l : c0[i + 2]; }
         o.instanceColor.needsUpdate = true;
       }
       m.needsUpdate = true;
     }
     if (on) {
-      hemi.color.setHex(0xffffff); hemi.groundColor.setHex(0x8a8a8a); hemi.intensity = 1.05;
-      moon.color.setHex(0xffffff); moon.intensity = 0.9;
-      sodiumLamp.color.setHex(0xffffff); sodiumLamp.intensity = 0.6;
-      scene.background.copy(uni.uPaper.value); scene.fog.color.copy(uni.uPaper.value);
+      // one hard key light: faces turned to it are paper, the others fall into ink
+      hemi.color.setHex(0xffffff); hemi.groundColor.setHex(0x000000); hemi.intensity = 0.3;
+      moon.color.setHex(0xffffff); moon.intensity = 1.25;
+      sodiumLamp.color.setHex(0xffffff); sodiumLamp.intensity = 0.4;
+      scene.background.copy(uni.uInk.value); scene.fog.color.copy(uni.uInk.value);
     } else {
       hemi.color.copy(light0.hemiC); hemi.groundColor.copy(light0.hemiG); hemi.intensity = light0.hemiI;
-      moon.color.copy(light0.moonC); moon.intensity = light0.moonI;
+      moon.color.copy(light0.moonC); moon.intensity = light0.moonI; moon.position.copy(moon0);
       sodiumLamp.color.copy(light0.lampC); sodiumLamp.intensity = light0.lampI;
       scene.background.copy(light0.bg); scene.fog.color.copy(light0.fog);
     }
@@ -2664,6 +2661,9 @@ const ink = (() => {
     if (size.x !== uni.uRes.value.x || size.y !== uni.uRes.value.y) { rt.setSize(size.x, size.y); uni.uRes.value.copy(size); }
     uni.uPx.value = Math.max(1, size.y / 720);
     uni.uTime.value = time; uni.uSpeed.value = reduceMotion ? 0 : speed;
+    // the key light follows the camera (above, behind, from the left) so the faces we see are mostly paper
+    camera.getWorldDirection(fwd); right.crossVectors(fwd, camera.up).normalize();
+    moon.position.copy(camera.up).multiplyScalar(0.75).addScaledVector(fwd, -0.45).addScaledVector(right, -0.5).multiplyScalar(100);
     renderer.setRenderTarget(rt); renderer.render(scene, camera);
     renderer.setRenderTarget(null); renderer.render(postScene, postCam);
   }
